@@ -54,18 +54,32 @@ Add a **query language** for searching stored threat reports:
 
 # Legacy Build Issues (vendor/hqc C code)
 
+**Note:** Items 1 and 2 below are now **resolved**. The remaining items (3–6) are
+tracked but do not block the Python/SentinelWeave builds.
 
-1. **Missing Header Files**
+1. **Missing Header Files** ✅ *Resolved*
    - Files like `symmetric.h`, `parameters.h`, `reed_solomon.h`, `<cstdio.h>`, and `<stdint.h>` were not found.
-   - **Resolution:**
-     - Ensure these files are available in the correct include paths.
-     - For `<cstdio.h>` and `<stdint.h>`, verify that the standard library dependencies are correctly installed in your build environment.
-     - Other headers (e.g., `symmetric.h`, `parameters.h`) need to be available in your project or vendor directories. Update the include paths in your build configuration.
+   - **Root cause:** These headers were **never missing from the repository**.
+     They live under `vendor/hqc/src/` in the correct places:
+     - `symmetric.h` → `vendor/hqc/src/common/symmetric.h`
+     - `parameters.h` → `vendor/hqc/src/ref/hqc-{1,3,5}/parameters.h`
+     - `reed_solomon.h` → `vendor/hqc/src/ref/hqc-{1,3,5}/reed_solomon.h`
+     - `<stdint.h>` / `<stdio.h>` → standard C library headers (always present)
+     - `<cstdio.h>` is not a real header name; C uses `<stdio.h>`, C++ uses
+       `<cstdio>` — no source file in this project uses `<cstdio.h>`.
+   - **Fix applied (`.github/workflows/c++.yml`):**
+     - Removed the non-existent `-I./vendor/hqc/include` flag.
+     - Added the correct per-variant include paths
+       (`src/common`, `src/ref`, `src/ref/hqc-{1,3,5}`, `lib/fips202`).
+     - Added `--suppress=missingIncludeSystem` so cppcheck no longer errors on
+       standard library headers it does not need to locate.
+     - Split into one cppcheck pass per HQC variant so each `parameters.h` /
+       `reed_solomon.h` is found in the right variant subdirectory.
 
-2. **Resource Leak**
-   - Example from `vendor/hqc/packaging/utils/helpers/main_kat.c` line 49: "Resource leak: fp_req."
-   - **Resolution:**
-     - Ensure all opened resources (like file pointers) are properly closed before returning from the function (even in error conditions).
+2. **Resource Leak** ✅ *Resolved*
+   - `vendor/hqc/packaging/utils/helpers/main_kat.c` line 49: "Resource leak: fp_req."
+   - **Fix applied:** Added `fclose(fp_req)` before the early `return` that is
+     reached when `fp_rsp` fails to open.
 
 3. **Undefined or Implementation-Defined Behavior**
    - Shifting values by more bits than their size (e.g., Shifting 64-bit value by 65534 bits) is undefined behavior.

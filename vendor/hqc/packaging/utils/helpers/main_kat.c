@@ -46,6 +46,7 @@ int main(void) {
     sprintf(fn_rsp, "PQCkemKAT_%d.rsp", CRYPTO_SECRETKEYBYTES);
     if ((fp_rsp = fopen(fn_rsp, "w")) == NULL) {
         printf("Couldn't open <%s> for write\n", fn_rsp);
+        fclose(fp_req);
         return KAT_FILE_OPEN_ERROR;
     }
 
