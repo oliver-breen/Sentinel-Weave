@@ -38,6 +38,9 @@ from .availability_monitor import (
 from .email_scanner import (
     EmailScanner, EmailMessage, EmailScanResult, EmailIndicator,
 )
+from .siem_exporter import (
+    SiemExporter, CefRecord, LeefRecord,
+)
 
 __all__ = [
     # Event parsing
@@ -82,4 +85,8 @@ __all__ = [
     "EmailMessage",
     "EmailScanResult",
     "EmailIndicator",
+    # SIEM export
+    "SiemExporter",
+    "CefRecord",
+    "LeefRecord",
 ]
