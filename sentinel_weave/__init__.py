@@ -35,6 +35,9 @@ from .availability_monitor import (
     TokenBucketRateLimiter, AvailabilityMonitor,
     AvailabilityAlert, AlertSeverity, RateLimitResult,
 )
+from .email_scanner import (
+    EmailScanner, EmailMessage, EmailScanResult, EmailIndicator,
+)
 
 __all__ = [
     # Event parsing
@@ -74,4 +77,9 @@ __all__ = [
     "AvailabilityAlert",
     "AlertSeverity",
     "RateLimitResult",
+    # Email scanning
+    "EmailScanner",
+    "EmailMessage",
+    "EmailScanResult",
+    "EmailIndicator",
 ]

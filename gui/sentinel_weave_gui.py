@@ -15,6 +15,8 @@ Tabs
 5. Access Control  — interactive RBAC: role/action/resource → GRANTED / DENIED
 6. Integrity       — HMAC event signing, tamper simulation, audit chain
 7. Availability    — token-bucket rate-limiter demo, service heartbeat tracker
+8. Email Scanner   — phishing/malware/spoofing detection for individual &
+                     enterprise users; single, batch, and IMAP inbox modes
 
 Run
 ---
@@ -28,6 +30,7 @@ Requirements
 from __future__ import annotations
 
 import os
+import re
 import sys
 import time
 import json
@@ -1491,6 +1494,611 @@ class AvailabilityTab(QWidget):
 
 
 # ===========================================================================
+# Email Scanner Tab
+# ===========================================================================
+
+from sentinel_weave.email_scanner import (                          # noqa: E402
+    EmailScanner, EmailMessage as _EmailMessage,
+    EmailScanResult, EmailIndicator,
+)
+
+# Colour map for threat levels (reuse _THREAT_COLOUR defined earlier)
+_EMAIL_SAMPLE_PHISHING = """\
+From: PayPal Security <security-alert@paypa1-verify.com>
+To: user@example.com
+Reply-To: harvest@phish-collect.ru
+Subject: Your account has been suspended - verify your account immediately
+Date: Fri, 13 Mar 2026 12:00:00 +0000
+
+Dear customer,
+
+We detected unusual sign-in activity on your PayPal account.
+You must respond within 24 hours or we will terminate your account.
+
+Please click here immediately to verify your account:
+    http://bit.ly/paypal-verify-now
+
+Do NOT ignore this email.  This is your final warning.
+"""
+
+_EMAIL_SAMPLE_LEGITIMATE = """\
+From: Alice Johnson <alice@acme.com>
+To: Bob Smith <bob@acme.com>
+Subject: Team meeting tomorrow at 10am
+Date: Fri, 13 Mar 2026 09:00:00 +0000
+Message-ID: <mtg-20260313@acme.com>
+
+Hi Bob,
+
+Just a reminder about our weekly team meeting tomorrow at 10am in room 2B.
+Please bring your Q1 update slides.
+
+Best,
+Alice
+"""
+
+_EMAIL_SAMPLE_MALWARE = """\
+From: IT Helpdesk <support@corp-helpdesk.tk>
+To: employee@company.com
+Subject: Action required: install critical security patch immediately
+
+Dear valued member,
+
+Please download and run the attached security patch.
+The installer is called security_patch_v3.exe.
+
+This is your final warning — failure to install will lock your account.
+Your password will expire in 24 hours.
+
+Open the password-protected zip: patch_bundle.zip  (password: corp2026)
+"""
+
+
+class _EmailScanWorker(QThread):
+    """Background thread for batch email scanning."""
+    finished = pyqtSignal(list)   # list[EmailScanResult]
+
+    def __init__(self, raw_emails: list[str]) -> None:
+        super().__init__()
+        self._raws = raw_emails
+
+    def run(self) -> None:
+        scanner = EmailScanner()
+        results = scanner.scan_bulk_raw(self._raws)
+        self.finished.emit(results)
+
+
+class EmailScannerTab(QWidget):
+    """
+    Tab 8 — Email Scanner.
+
+    Allows individual users and enterprise teams to paste, type, or
+    batch-submit email content and get instant threat analysis.
+
+    Sub-tabs:
+      • Single Email — paste / type one email (or use sample templates)
+      • Batch Scan   — one email per block, separated by '---', table summary
+      • IMAP Inbox   — connect to a live mailbox and scan the last N messages
+    """
+
+    def __init__(self, state: "AppState") -> None:
+        super().__init__()
+        self._state   = state
+        self._scanner = EmailScanner()
+        self._batch_results: list[EmailScanResult] = []
+        self._setup_ui()
+
+    # ------------------------------------------------------------------
+    def _setup_ui(self) -> None:
+        root = QVBoxLayout()
+        self.setLayout(root)
+
+        header = QLabel("📧  Email Threat Scanner  —  Phishing • Malware Delivery • Spoofing")
+        header.setStyleSheet(
+            f"font-size: 14px; font-weight: bold; color: {_C['accent']};"
+            f"padding: 6px; background: {_C['header']}; border-radius: 4px;"
+        )
+        root.addWidget(header)
+
+        sub_tabs = QTabWidget()
+        sub_tabs.setStyleSheet(
+            f"QTabWidget::pane {{ border: 1px solid {_C['border']}; }}"
+            f"QTabBar::tab {{ background: {_C['surface']}; color: {_C['muted']};"
+            f"  padding: 6px 12px; }}"
+            f"QTabBar::tab:selected {{ background: {_C['header']};"
+            f"  color: {_C['accent']}; font-weight: bold; }}"
+        )
+        root.addWidget(sub_tabs)
+
+        sub_tabs.addTab(self._build_single_tab(), "✉  Single Email")
+        sub_tabs.addTab(self._build_batch_tab(),  "📦  Batch Scan")
+        sub_tabs.addTab(self._build_imap_tab(),   "📥  IMAP Inbox")
+
+    # -------------------------
+    # Sub-tab 1 — Single Email
+    # -------------------------
+    def _build_single_tab(self) -> QWidget:
+        w   = QWidget()
+        lay = QHBoxLayout()
+        w.setLayout(lay)
+
+        # Left: input
+        left = QVBoxLayout()
+        ctrl = QHBoxLayout()
+
+        lbl = QLabel("Paste or type email text (RFC 5322 or free-text body):")
+        lbl.setStyleSheet(f"color: {_C['muted']}; font-size: 12px;")
+        ctrl.addWidget(lbl)
+        ctrl.addStretch()
+
+        load_phish = _make_button("Load Phishing Sample", _C["red"])
+        load_phish.setFixedWidth(180)
+        load_phish.clicked.connect(lambda: self._single_input.setPlainText(_EMAIL_SAMPLE_PHISHING))
+        ctrl.addWidget(load_phish)
+
+        load_legit = _make_button("Load Legit Sample", _C["green"])
+        load_legit.setFixedWidth(160)
+        load_legit.clicked.connect(lambda: self._single_input.setPlainText(_EMAIL_SAMPLE_LEGITIMATE))
+        ctrl.addWidget(load_legit)
+
+        load_malware = _make_button("Load Malware Sample", _C["orange"])
+        load_malware.setFixedWidth(180)
+        load_malware.clicked.connect(lambda: self._single_input.setPlainText(_EMAIL_SAMPLE_MALWARE))
+        ctrl.addWidget(load_malware)
+
+        left.addLayout(ctrl)
+
+        self._single_input = _plain("Paste email here…")
+        self._single_input.setMinimumHeight(200)
+        left.addWidget(self._single_input)
+
+        btn_row = QHBoxLayout()
+        scan_btn = _make_button("🔍  Scan Email", _C["accent"])
+        scan_btn.setFixedWidth(140)
+        scan_btn.clicked.connect(self._scan_single)
+        clear_btn = _make_button("🗑  Clear", _C["muted"])
+        clear_btn.setFixedWidth(80)
+        clear_btn.clicked.connect(lambda: (self._single_input.clear(), self._clear_single_result()))
+        btn_row.addWidget(scan_btn)
+        btn_row.addWidget(clear_btn)
+        btn_row.addStretch()
+        left.addLayout(btn_row)
+
+        lay.addLayout(left, 1)
+
+        # Right: results
+        right = QVBoxLayout()
+
+        # Verdict badge
+        verdict_box = _section("Verdict")
+        vv = QVBoxLayout()
+
+        self._verdict_label = QLabel("—")
+        self._verdict_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._verdict_label.setStyleSheet(
+            f"font-size: 22px; font-weight: bold; padding: 12px;"
+            f"background: {_C['surface']}; border-radius: 6px;"
+        )
+        vv.addWidget(self._verdict_label)
+
+        risk_row = QHBoxLayout()
+        risk_row.addWidget(QLabel("Risk Score:"))
+        self._risk_bar = _progress(_C["red"])
+        self._risk_bar.setValue(0)
+        self._risk_bar.setFormat("—")
+        risk_row.addWidget(self._risk_bar)
+        vv.addLayout(risk_row)
+
+        verdict_box.setLayout(vv)
+        right.addWidget(verdict_box)
+
+        # Indicators table
+        ind_box = _section("Threat Indicators")
+        iv = QVBoxLayout()
+        self._ind_table = _table(["Indicator", "Weight", "Evidence"])
+        self._ind_table.setMaximumHeight(180)
+        iv.addWidget(self._ind_table)
+        ind_box.setLayout(iv)
+        right.addWidget(ind_box)
+
+        # Explanation
+        exp_box = _section("Explanation")
+        ev = QVBoxLayout()
+        self._exp_label = QLabel("Scan an email to see the threat analysis.")
+        self._exp_label.setWordWrap(True)
+        self._exp_label.setStyleSheet(
+            f"color: {_C['text']}; background: {_C['surface']};"
+            f"padding: 8px; border-radius: 4px; font-size: 12px;"
+        )
+        ev.addWidget(self._exp_label)
+        exp_box.setLayout(ev)
+        right.addWidget(exp_box)
+
+        lay.addLayout(right, 1)
+        return w
+
+    # -------------------------
+    # Sub-tab 2 — Batch Scan
+    # -------------------------
+    def _build_batch_tab(self) -> QWidget:
+        w   = QWidget()
+        lay = QVBoxLayout()
+        w.setLayout(lay)
+
+        hint = QLabel(
+            "Paste multiple emails separated by a line containing only  ---  "
+            "(three dashes).  One email per block."
+        )
+        hint.setWordWrap(True)
+        hint.setStyleSheet(f"color: {_C['muted']}; font-size: 12px; padding-bottom: 4px;")
+        lay.addWidget(hint)
+
+        splitter = QSplitter(Qt.Orientation.Vertical)
+
+        self._batch_input = _plain("Paste emails here, separated by ---")
+        self._batch_input.setMinimumHeight(160)
+        splitter.addWidget(self._batch_input)
+
+        result_widget = QWidget()
+        rv = QVBoxLayout()
+        result_widget.setLayout(rv)
+
+        # Controls
+        ctrl = QHBoxLayout()
+        load_samples = _make_button("Load 3 Sample Emails", _C["accent"])
+        load_samples.clicked.connect(self._load_batch_samples)
+        scan_all_btn = _make_button("🔍  Scan All", _C["accent"])
+        scan_all_btn.clicked.connect(self._scan_batch)
+        self._batch_progress = QLabel("")
+        self._batch_progress.setStyleSheet(f"color: {_C['muted']}; font-size: 11px;")
+        export_btn = _make_button("💾  Export CSV", _C["green"])
+        export_btn.clicked.connect(self._export_batch_csv)
+        ctrl.addWidget(load_samples)
+        ctrl.addWidget(scan_all_btn)
+        ctrl.addWidget(self._batch_progress)
+        ctrl.addStretch()
+        ctrl.addWidget(export_btn)
+        rv.addLayout(ctrl)
+
+        # Summary stat row
+        stat_row = QHBoxLayout()
+        self._batch_total_lbl   = QLabel("Total: 0")
+        self._batch_safe_lbl    = QLabel("Safe: 0")
+        self._batch_threat_lbl  = QLabel("Threats: 0")
+        self._batch_avg_lbl     = QLabel("Avg risk: —")
+        for lbl in (self._batch_total_lbl, self._batch_safe_lbl,
+                    self._batch_threat_lbl, self._batch_avg_lbl):
+            lbl.setStyleSheet(
+                f"background: {_C['surface']}; padding: 4px 10px;"
+                f"border-radius: 4px; font-size: 12px;"
+            )
+            stat_row.addWidget(lbl)
+        stat_row.addStretch()
+        rv.addLayout(stat_row)
+
+        # Results table
+        self._batch_table = _table(
+            ["#", "Subject", "From", "Threat Level", "Risk Score", "Top Indicator"]
+        )
+        self._batch_table.currentCellChanged.connect(
+            lambda row, *_: self._show_batch_detail(row)
+        )
+        rv.addWidget(self._batch_table)
+
+        # Detail panel
+        detail_box = _section("Selected Email Detail")
+        dv = QVBoxLayout()
+        self._batch_detail = QLabel("Select a row to see the full explanation.")
+        self._batch_detail.setWordWrap(True)
+        self._batch_detail.setStyleSheet(
+            f"color: {_C['text']}; background: {_C['surface']};"
+            f"padding: 8px; border-radius: 4px; font-size: 12px;"
+        )
+        dv.addWidget(self._batch_detail)
+        detail_box.setLayout(dv)
+        rv.addWidget(detail_box)
+
+        splitter.addWidget(result_widget)
+        lay.addWidget(splitter)
+        return w
+
+    # -------------------------
+    # Sub-tab 3 — IMAP Inbox
+    # -------------------------
+    def _build_imap_tab(self) -> QWidget:
+        w   = QWidget()
+        lay = QVBoxLayout()
+        w.setLayout(lay)
+
+        note = QLabel(
+            "Connect to any IMAP mailbox (Gmail, Outlook, Exchange …) and scan "
+            "the most-recent messages for threats.  Credentials are used only "
+            "for the IMAP connection — they are never stored or transmitted elsewhere."
+        )
+        note.setWordWrap(True)
+        note.setStyleSheet(f"color: {_C['muted']}; font-size: 12px; padding-bottom: 6px;")
+        lay.addWidget(note)
+
+        form_box = _section("IMAP Connection")
+        form = QFormLayout()
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+
+        self._imap_host    = _line("e.g. imap.gmail.com")
+        self._imap_port    = QSpinBox()
+        self._imap_port.setRange(1, 65535)
+        self._imap_port.setValue(993)
+        self._imap_port.setStyleSheet(
+            f"QSpinBox {{ background: {_C['surface']}; color: {_C['text']};"
+            f"  border: 1px solid {_C['border']}; border-radius: 4px; padding: 2px; }}"
+        )
+        self._imap_user    = _line("your@email.com")
+        self._imap_pass    = _line("App password / password")
+        self._imap_pass.setEchoMode(QLineEdit.EchoMode.Password)
+        self._imap_folder  = _line("INBOX")
+        self._imap_folder.setText("INBOX")
+        self._imap_limit   = QSpinBox()
+        self._imap_limit.setRange(1, 500)
+        self._imap_limit.setValue(20)
+        self._imap_limit.setStyleSheet(
+            f"QSpinBox {{ background: {_C['surface']}; color: {_C['text']};"
+            f"  border: 1px solid {_C['border']}; border-radius: 4px; padding: 2px; }}"
+        )
+
+        form.addRow("IMAP Host:", self._imap_host)
+        form.addRow("Port:",       self._imap_port)
+        form.addRow("Username:",   self._imap_user)
+        form.addRow("Password:",   self._imap_pass)
+        form.addRow("Folder:",     self._imap_folder)
+        form.addRow("Scan last N:", self._imap_limit)
+        form_box.setLayout(form)
+        lay.addWidget(form_box)
+
+        btn_row = QHBoxLayout()
+        connect_btn = _make_button("📥  Connect & Scan", _C["accent"])
+        connect_btn.clicked.connect(self._imap_scan)
+        self._imap_status = QLabel("")
+        self._imap_status.setStyleSheet(f"color: {_C['muted']}; font-size: 11px;")
+        btn_row.addWidget(connect_btn)
+        btn_row.addWidget(self._imap_status)
+        btn_row.addStretch()
+        lay.addLayout(btn_row)
+
+        # Results re-use batch table
+        self._imap_table = _table(
+            ["#", "Subject", "From", "Threat Level", "Risk Score", "Top Indicator"]
+        )
+        lay.addWidget(self._imap_table)
+
+        self._imap_summary = QLabel("")
+        self._imap_summary.setWordWrap(True)
+        self._imap_summary.setStyleSheet(
+            f"color: {_C['text']}; background: {_C['surface']};"
+            f"padding: 6px; border-radius: 4px; font-size: 12px;"
+        )
+        lay.addWidget(self._imap_summary)
+        return w
+
+    # ------------------------------------------------------------------
+    # Actions — Single
+    # ------------------------------------------------------------------
+
+    def _scan_single(self) -> None:
+        raw = self._single_input.toPlainText().strip()
+        if not raw:
+            return
+
+        result = self._scanner.scan_raw(raw)
+        self._render_single_result(result)
+
+    def _render_single_result(self, result: EmailScanResult) -> None:
+        level  = result.threat_level
+        colour = _THREAT_COLOUR.get(level, _C["text"])
+        icon   = {
+            ThreatLevel.BENIGN:   "✅",
+            ThreatLevel.LOW:      "🟡",
+            ThreatLevel.MEDIUM:   "🟠",
+            ThreatLevel.HIGH:     "🚨",
+            ThreatLevel.CRITICAL: "💀",
+        }.get(level, "❓")
+
+        self._verdict_label.setText(f"{icon}  {level.value}")
+        self._verdict_label.setStyleSheet(
+            f"font-size: 22px; font-weight: bold; padding: 12px;"
+            f"background: {colour}22; color: {colour}; border-radius: 6px;"
+            f"border: 2px solid {colour};"
+        )
+
+        pct = int(result.risk_score * 100)
+        self._risk_bar.setStyleSheet(
+            f"QProgressBar {{ background: {_C['border']}; border-radius: 4px; height: 18px; }}"
+            f"QProgressBar::chunk {{ background: {colour}; border-radius: 4px; }}"
+        )
+        self._risk_bar.setValue(pct)
+        self._risk_bar.setFormat(f"{pct}%  ({level.value})")
+
+        # Indicators
+        self._ind_table.setRowCount(0)
+        for ind in result.indicators:
+            w_colour = _C["red"] if ind.weight >= 0.7 else (
+                _C["orange"] if ind.weight >= 0.4 else _C["yellow"]
+            )
+            evidence_str = " | ".join(ind.evidence[:2])
+            _add_row(
+                self._ind_table,
+                [ind.name, f"{ind.weight:.2f}", evidence_str],
+                row_colour=w_colour,
+            )
+
+        self._exp_label.setText(result.explanation)
+
+    def _clear_single_result(self) -> None:
+        self._verdict_label.setText("—")
+        self._verdict_label.setStyleSheet(
+            f"font-size: 22px; font-weight: bold; padding: 12px;"
+            f"background: {_C['surface']}; border-radius: 6px;"
+        )
+        self._risk_bar.setValue(0)
+        self._risk_bar.setFormat("—")
+        self._ind_table.setRowCount(0)
+        self._exp_label.setText("Scan an email to see the threat analysis.")
+
+    # ------------------------------------------------------------------
+    # Actions — Batch
+    # ------------------------------------------------------------------
+
+    def _load_batch_samples(self) -> None:
+        sep = "\n---\n"
+        self._batch_input.setPlainText(
+            _EMAIL_SAMPLE_PHISHING + sep
+            + _EMAIL_SAMPLE_LEGITIMATE + sep
+            + _EMAIL_SAMPLE_MALWARE
+        )
+
+    def _scan_batch(self) -> None:
+        raw = self._batch_input.toPlainText().strip()
+        if not raw:
+            return
+
+        blocks = [b.strip() for b in re.split(r"^---$", raw, flags=re.MULTILINE) if b.strip()]
+        if not blocks:
+            return
+
+        self._batch_progress.setText(f"Scanning {len(blocks)} email(s)…")
+        self._batch_table.setRowCount(0)
+
+        self._batch_worker = _EmailScanWorker(blocks)
+        self._batch_worker.finished.connect(self._on_batch_done)
+        self._batch_worker.start()
+
+    def _on_batch_done(self, results: list[EmailScanResult]) -> None:
+        self._batch_results = results
+        self._batch_table.setRowCount(0)
+
+        for idx, r in enumerate(results):
+            level   = r.threat_level
+            colour  = _THREAT_COLOUR.get(level, _C["text"])
+            top_ind = r.indicators[0].name if r.indicators else "—"
+            _add_row(
+                self._batch_table,
+                [
+                    str(idx + 1),
+                    (r.email.subject or "(no subject)")[:50],
+                    (r.email.sender or "—")[:40],
+                    level.value,
+                    f"{r.risk_score:.1%}",
+                    top_ind,
+                ],
+                row_colour=colour,
+            )
+
+        summary = EmailScanner.summarize(results)
+        self._batch_total_lbl.setText(f"Total: {summary['total']}")
+        self._batch_safe_lbl.setText(f"✅ Safe: {summary['safe']}")
+        self._batch_threat_lbl.setText(f"🚨 Threats: {summary['threats']}")
+        self._batch_avg_lbl.setText(f"Avg risk: {summary['avg_risk_score']:.1%}")
+        self._batch_progress.setText(f"Done — {len(results)} emails scanned.")
+
+    def _show_batch_detail(self, row: int) -> None:
+        if row < 0 or row >= len(self._batch_results):
+            return
+        r = self._batch_results[row]
+        ind_lines = "\n".join(
+            f"  • {i.name} (weight {i.weight:.2f}): {i.description}"
+            for i in r.indicators
+        )
+        text = (
+            f"Subject : {r.email.subject or '(none)'}\n"
+            f"From    : {r.email.sender or '(none)'}\n"
+            f"Level   : {r.threat_level.value}  |  Risk: {r.risk_score:.1%}\n\n"
+            f"{r.explanation}\n\n"
+            + (f"Indicators:\n{ind_lines}" if ind_lines else "No indicators triggered.")
+        )
+        self._batch_detail.setText(text)
+
+    def _export_batch_csv(self) -> None:
+        """Write batch results to /tmp/email_scan_results.csv."""
+        import csv, io
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(["#", "Subject", "From", "Threat Level", "Risk Score",
+                          "Indicators", "Explanation"])
+        for idx, r in enumerate(self._batch_results):
+            inds = "; ".join(i.name for i in r.indicators)
+            writer.writerow([
+                idx + 1,
+                r.email.subject,
+                r.email.sender,
+                r.threat_level.value,
+                f"{r.risk_score:.4f}",
+                inds,
+                r.explanation,
+            ])
+        path = "/tmp/email_scan_results.csv"
+        with open(path, "w", newline="", encoding="utf-8") as f:
+            f.write(buf.getvalue())
+        self._batch_progress.setText(f"Exported to {path}")
+
+    # ------------------------------------------------------------------
+    # Actions — IMAP
+    # ------------------------------------------------------------------
+
+    def _imap_scan(self) -> None:
+        host   = self._imap_host.text().strip()
+        port   = self._imap_port.value()
+        user   = self._imap_user.text().strip()
+        passwd = self._imap_pass.text()
+        folder = self._imap_folder.text().strip() or "INBOX"
+        limit  = self._imap_limit.value()
+
+        if not host or not user or not passwd:
+            self._imap_status.setText("⚠  Please fill in host, username, and password.")
+            return
+
+        self._imap_status.setText(f"Connecting to {host}:{port} …")
+        self._imap_table.setRowCount(0)
+        self._imap_summary.setText("")
+        QApplication.processEvents()
+
+        try:
+            results = self._scanner.connect_and_scan_imap(
+                host=host, username=user, password=passwd,
+                port=port, folder=folder, limit=limit,
+            )
+        except Exception as exc:  # noqa: BLE001
+            self._imap_status.setText(f"❌  Connection failed: {exc}")
+            return
+
+        self._imap_table.setRowCount(0)
+        for idx, r in enumerate(results):
+            level  = r.threat_level
+            colour = _THREAT_COLOUR.get(level, _C["text"])
+            top    = r.indicators[0].name if r.indicators else "—"
+            _add_row(
+                self._imap_table,
+                [
+                    str(idx + 1),
+                    (r.email.subject or "(no subject)")[:50],
+                    (r.email.sender or "—")[:40],
+                    level.value,
+                    f"{r.risk_score:.1%}",
+                    top,
+                ],
+                row_colour=colour,
+            )
+
+        summary = EmailScanner.summarize(results)
+        self._imap_status.setText(
+            f"✅  Scanned {summary['total']} message(s)  |  "
+            f"Threats: {summary['threats']}  |  Safe: {summary['safe']}"
+        )
+        self._imap_summary.setText(
+            f"Average risk score: {summary['avg_risk_score']:.1%}  |  "
+            f"Top signals: "
+            + ", ".join(n for n, _ in summary["top_indicators"][:5])
+        )
+
+
+# ===========================================================================
 # Main Window
 # ===========================================================================
 
@@ -1542,6 +2150,7 @@ class SentinelWeaveApp(QMainWindow):
         self._rbac_tab   = AccessControlTab(self._state)
         self._integ_tab  = IntegrityTab(self._state)
         self._avail_tab  = AvailabilityTab(self._state)
+        self._email_tab  = EmailScannerTab(self._state)
 
         tabs.addTab(self._dash,       "🏠  Dashboard")
         tabs.addTab(self._log_tab,    "📋  Log Analyzer")
@@ -1550,6 +2159,7 @@ class SentinelWeaveApp(QMainWindow):
         tabs.addTab(self._rbac_tab,   "🔑  Access Control")
         tabs.addTab(self._integ_tab,  "🔗  Integrity Monitor")
         tabs.addTab(self._avail_tab,  "📡  Availability")
+        tabs.addTab(self._email_tab,  "📧  Email Scanner")
 
         # Wire up signals so tabs stay in sync
         self._log_tab.events_updated.connect(self._threat_tab.refresh)
