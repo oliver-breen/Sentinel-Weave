@@ -22,7 +22,8 @@ from .threat_detector   import ThreatDetector, ThreatReport, ThreatLevel, summar
 from .azure_integration import BlobStorageClient, TextAnalyticsClient, SecurityTelemetry
 from .threat_correlator import ThreatCorrelator, AttackCampaign
 from .ml_pipeline       import (
-    SecurityClassifier, DatasetBuilder, LabeledEvent, evaluate_classifier,
+    SecurityClassifier, DatasetBuilder, LabeledEvent,
+    evaluate_classifier, k_fold_cross_validate,
 )
 
 __all__ = [
@@ -43,6 +44,7 @@ __all__ = [
     "DatasetBuilder",
     "LabeledEvent",
     "evaluate_classifier",
+    "k_fold_cross_validate",
     # Azure integration
     "BlobStorageClient",
     "TextAnalyticsClient",

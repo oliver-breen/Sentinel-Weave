@@ -19,12 +19,15 @@ What this demo covers
   Phase 4  – Handle class imbalance via oversampling
   Phase 5  – Train/test split and SecurityClassifier training
   Phase 6  – ASCII learning curve (loss vs. epoch)
-  Phase 7  – Full evaluation: confusion matrix + precision/recall/F1
+  Phase 7  – Full evaluation: confusion matrix + precision/recall/F1 + ROC-AUC
   Phase 8  – Feature importance (ranked model weights)
   Phase 9  – Decision-threshold sensitivity sweep
   Phase 10 – Save model to JSON and reload, verify predictions match
   Phase 11 – Export Azure ML scoring schema
-  Phase 12 – [optional --interact] Type your own log line and classify it live
+  Phase 12 – Explainability: per-feature contribution breakdown
+  Phase 13 – Online / incremental learning with partial_fit()
+  Phase 14 – K-Fold cross-validation (robust performance estimate)
+  Phase 15 – [optional --interact] Type your own log line and classify it live
 """
 
 import argparse
@@ -44,6 +47,7 @@ from sentinel_weave.ml_pipeline import (
     LabeledEvent,
     SecurityClassifier,
     evaluate_classifier,
+    k_fold_cross_validate,
 )
 
 
@@ -352,6 +356,7 @@ def run_demo(epochs: int = 250, interact: bool = False) -> None:
     print(f"  Precision : {_bar(metrics['precision'], bar_w)}  {metrics['precision']:.4f}")
     print(f"  Recall    : {_bar(metrics['recall'],    bar_w)}  {metrics['recall']:.4f}")
     print(f"  F1 Score  : {_bar(metrics['f1'],        bar_w)}  {metrics['f1']:.4f}")
+    print(f"  ROC-AUC   : {_bar(metrics['roc_auc'],   bar_w)}  {metrics['roc_auc']:.4f}")
     print()
     total = tp + fp + tn + fn
     print(f"  Correct predictions : {tp + tn}/{total}")
@@ -439,9 +444,112 @@ def run_demo(epochs: int = 250, interact: bool = False) -> None:
     print("  " + _c("✔ Schema ready — drop model_spec into Azure ML as an artifact", "GREEN"))
     print("    and paste the score_function_stub into your score.py endpoint.")
 
-    # ── Phase 12: interactive ──────────────────────────────────────────────
+    # ── Phase 12: explainability ───────────────────────────────────────────
+    _header("Phase 12 — Explainability: Per-Feature Contribution Breakdown")
+    print("  For logistic regression each feature's contribution = weight × feature_value.")
+    print("  Positive → pushes toward THREAT;  negative → pushes toward BENIGN.\n")
+
+    explain_cases = [
+        ("Archetypal THREAT",
+         "Failed password for root from 198.51.100.42 port 54321 ssh2"),
+        ("Archetypal BENIGN",
+         "Jan 10 08:00:01 app01 cron: Running daily backup job for user svcaccount"),
+    ]
+    for label_str, log_line in explain_cases:
+        ev    = analyzer.parse(log_line)
+        expl  = clf.explain(ev.features)
+        proba = expl["probability"]
+        colour = "RED" if proba >= 0.5 else "GREEN"
+        print(f"  {_c(label_str, colour)}  (probability={proba:.4f})")
+        print(f"    Log: {_c(log_line[:72], 'DIM')}")
+        contribs = sorted(expl["contributions"].items(), key=lambda kv: kv[1], reverse=True)
+        max_abs = max(abs(v) for _, v in contribs) or 1.0
+        for fname, val in contribs[:6]:
+            direction = _c(f"{val:+.4f}", "RED" if val > 0 else "GREEN")
+            bar = _bar(abs(val) / max_abs, 18)
+            print(f"    {fname:<30} {direction}  {bar}")
+        if expl["top_threat_factor"]:
+            print(f"    Top threat factor : {_c(expl['top_threat_factor'], 'RED')}")
+        if expl["top_benign_factor"]:
+            print(f"    Top benign factor : {_c(expl['top_benign_factor'], 'GREEN')}")
+        print()
+
+    # ── Phase 13: online / incremental learning ────────────────────────────
+    _header("Phase 13 — Online Learning: partial_fit() with New Labeled Events")
+    print("  In production, new ground-truth labels arrive continuously.")
+    print("  partial_fit() updates the model without resetting its weights.\n")
+
+    # Simulate 3 batches of 10 newly labeled events
+    before_metrics = clf.evaluate(test_set)
+    new_threat_lines = [
+        "Jan 15 11:00:01 db01 sshd: Failed password for root from 203.0.113.7",
+        "Jan 15 11:00:02 db01 nginx: GET /?cmd=cat+/etc/passwd from 203.0.113.7",
+        "Jan 15 11:00:03 db01 auditd: PRIVILEGE_ESCALATION uid=0 process 9001",
+    ]
+    new_benign_lines = [
+        "Jan 15 11:01:00 app02 cron: backup job completed successfully",
+        "Jan 15 11:01:01 app02 systemd: Starting periodic cleanup service",
+        "Jan 15 11:01:02 app02 kernel: disk usage 42% on /var/log",
+    ]
+    new_events: list[LabeledEvent] = []
+    for line in new_threat_lines:
+        ev = analyzer.parse(line)
+        new_events.append(LabeledEvent(features=ev.features, label=1))
+    for line in new_benign_lines:
+        ev = analyzer.parse(line)
+        new_events.append(LabeledEvent(features=ev.features, label=0))
+
+    print(f"  New labeled events : {len(new_events)} ({len(new_threat_lines)} threats, "
+          f"{len(new_benign_lines)} benign)")
+    for batch_idx in range(3):
+        result = clf.partial_fit(new_events, epochs=5, seed=batch_idx)
+        print(f"  Batch {batch_idx + 1} → partial_fit loss : {result['loss']:.6f}")
+
+    after_metrics = clf.evaluate(test_set)
+    print()
+    print(f"  F1 before partial_fit : {before_metrics['f1']:.4f}")
+    print(f"  F1 after  partial_fit : {after_metrics['f1']:.4f}")
+    print(f"  ROC-AUC after         : {after_metrics['roc_auc']:.4f}")
+    print()
+    print("  " + _c("✔ Model updated incrementally — no full retraining required", "GREEN"))
+
+    # ── Phase 14: k-fold cross-validation ─────────────────────────────────
+    _header("Phase 14 — K-Fold Cross-Validation (Robust Performance Estimate)")
+    print("  A single train/test split can be misleading on small datasets.")
+    print("  K-fold CV averages metrics across k held-out folds for a more")
+    print("  statistically reliable estimate of generalisation performance.\n")
+
+    kfold_epochs = max(20, epochs // 5)   # use fewer epochs per fold for speed
+    print(f"  Running 5-fold CV (epochs={kfold_epochs} per fold) …")
+    cv_result = k_fold_cross_validate(
+        DatasetBuilder.balance(DatasetBuilder.from_reports(
+            detector.analyze_bulk(
+                analyzer.parse_bulk(
+                    [l for l in ALL_LINES if l.strip()]
+                )
+            )
+        )),
+        k=5,
+        epochs=kfold_epochs,
+    )
+    print()
+    print("  Metric       Mean      Std")
+    print("  " + "─" * 38)
+    for metric in ("accuracy", "precision", "recall", "f1", "roc_auc"):
+        mean_v = cv_result[f"mean_{metric}"]
+        std_v  = cv_result[f"std_{metric}"]
+        bar    = _bar(mean_v, 18)
+        print(f"  {metric:<12} {mean_v:.4f}  ±{std_v:.4f}  {bar}")
+    print()
+    print(f"  Folds completed : {len(cv_result['folds'])}")
+    fold_f1s = [f["f1"] for f in cv_result["folds"]]
+    print(f"  Per-fold F1     : {[f'{v:.3f}' for v in fold_f1s]}")
+    print()
+    print("  " + _c("✔ Cross-validation complete — metrics reflect generalisation ability", "GREEN"))
+
+    # ── Phase 15: interactive ──────────────────────────────────────────────
     if interact:
-        _header("Phase 12 — Live Classifier: Type Your Own Log Line")
+        _header("Phase 15 — Live Classifier: Type Your Own Log Line")
         print("  The trained model will classify any log line you enter.")
         print("  Press Ctrl+C or type 'quit' to exit.\n")
         while True:
@@ -459,6 +567,11 @@ def run_demo(epochs: int = 250, interact: bool = False) -> None:
                 print(f"  Prediction         : {_c(verdict, colour)}")
                 print(f"  Detector level     : {report.threat_level.value}")
                 print(f"  Signatures matched : {report.event.matched_sigs or ['none']}")
+                expl = clf.explain(event.features)
+                if expl["top_threat_factor"]:
+                    print(f"  Top threat factor  : {_c(expl['top_threat_factor'], 'RED')}")
+                if expl["top_benign_factor"]:
+                    print(f"  Top benign factor  : {_c(expl['top_benign_factor'], 'GREEN')}")
                 print()
             except KeyboardInterrupt:
                 print()
@@ -466,12 +579,14 @@ def run_demo(epochs: int = 250, interact: bool = False) -> None:
 
     # ── Summary ────────────────────────────────────────────────────────────
     _header("Demo Complete — Summary")
-    print(f"  Corpus size  : {len(ALL_LINES)} log lines")
-    print(f"  Training set : {len(train_set)} balanced examples")
-    print(f"  Test set     : {len(test_set)} examples")
-    print(f"  Accuracy     : {metrics['accuracy']:.4f}")
-    print(f"  F1 Score     : {metrics['f1']:.4f}")
-    print(f"  Model size   : 14 floats (13 weights + 1 bias)")
+    print(f"  Corpus size       : {len(ALL_LINES)} log lines")
+    print(f"  Training set      : {len(train_set)} balanced examples")
+    print(f"  Test set          : {len(test_set)} examples")
+    print(f"  Accuracy          : {metrics['accuracy']:.4f}")
+    print(f"  F1 Score          : {metrics['f1']:.4f}")
+    print(f"  ROC-AUC           : {metrics['roc_auc']:.4f}")
+    print(f"  5-fold mean F1    : {cv_result['mean_f1']:.4f}  ±{cv_result['std_f1']:.4f}")
+    print(f"  Model size        : 14 floats (13 weights + 1 bias)")
     print()
     print("  " + _c("SentinelWeave ML pipeline — combining Python, Azure AI, and", "BOLD"))
     print("  " + _c("cybersecurity into a deployable threat-detection system.", "BOLD"))

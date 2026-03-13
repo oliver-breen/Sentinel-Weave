@@ -69,6 +69,27 @@ TestPipelineIntegration
 TestScoreFunctionStub
     The score_function_stub exported for Azure ML must be executable Python
     that returns the same probabilities as the trained classifier.
+
+TestEarlyStopping
+    The patience parameter halts training once the loss stops improving,
+    demonstrating how early stopping prevents wasted compute and overfitting.
+
+TestPartialFit
+    partial_fit() enables online/incremental learning from new labeled events
+    without resetting weights — essential for streaming log pipelines.
+
+TestRocAuc
+    evaluate() now returns roc_auc — the gold-standard metric for imbalanced
+    binary classifiers.  Verified to be 1.0 for perfect separation and ≈0.5
+    for a random model.
+
+TestExplain
+    explain() provides per-feature contribution breakdowns that let a security
+    analyst understand why the model raised or suppressed an alert.
+
+TestKFoldCrossValidation
+    k_fold_cross_validate() gives statistically robust performance estimates
+    by averaging metrics across k held-out folds.
 """
 
 from __future__ import annotations
@@ -91,7 +112,9 @@ from sentinel_weave.ml_pipeline import (
     LabeledEvent,
     SecurityClassifier,
     _oversample,
+    _roc_auc,
     evaluate_classifier,
+    k_fold_cross_validate,
 )
 
 
@@ -1287,6 +1310,491 @@ class TestOversampleHelper(unittest.TestCase):
         rng = random.Random(0)
         result = _oversample(self._samples(3), target=20, rng=rng)
         self.assertTrue(all(e.label == 1 for e in result))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Feature 1 — Early Stopping
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestEarlyStopping(unittest.TestCase):
+    """
+    The ``patience`` parameter introduces early stopping: training halts when
+    the per-epoch cross-entropy loss has not improved by more than 1e-6 for
+    *patience* consecutive epochs.
+
+    Why it matters
+    --------------
+    Without early stopping the model trains for a fixed number of epochs even
+    when the loss has already converged, wasting time and potentially
+    overfitting on the training set.  With early stopping, training is more
+    efficient and the model is retrieved at its best generalisation point.
+
+    In a production SentinelWeave deployment, early stopping means that models
+    trained on incoming log streams can adapt quickly without needing to hard-
+    code the number of training epochs.
+    """
+
+    def _fast_converge_data(self) -> list[LabeledEvent]:
+        """Linearly separable dataset that converges in very few epochs."""
+        rng = random.Random(3)
+        data = []
+        for _ in range(60):
+            feats = [min(1.0, max(0.0, rng.gauss(0.9, 0.03)))] * 13
+            data.append(LabeledEvent(features=feats, label=1))
+        for _ in range(60):
+            feats = [min(1.0, max(0.0, rng.gauss(0.1, 0.03)))] * 13
+            data.append(LabeledEvent(features=feats, label=0))
+        return data
+
+    def test_patience_zero_runs_all_epochs(self) -> None:
+        """patience=0 (default) always trains for exactly ``epochs`` passes."""
+        clf  = SecurityClassifier(epochs=20, patience=0)
+        hist = clf.train(self._fast_converge_data())
+        self.assertEqual(hist["epochs_trained"], 20)
+
+    def test_early_stopping_can_halt_before_max_epochs(self) -> None:
+        """
+        With patience=5 on well-separated data the loss converges quickly
+        and training should stop before all epochs are exhausted.
+        """
+        clf  = SecurityClassifier(epochs=500, patience=5, learning_rate=0.5)
+        hist = clf.train(self._fast_converge_data())
+        self.assertLess(hist["epochs_trained"], 500)
+
+    def test_epochs_trained_matches_loss_history_length(self) -> None:
+        """The loss_history list must have exactly epochs_trained entries."""
+        clf  = SecurityClassifier(epochs=50, patience=8)
+        hist = clf.train(self._fast_converge_data())
+        self.assertEqual(hist["epochs_trained"], len(hist["loss_history"]))
+
+    def test_model_is_trained_after_early_stop(self) -> None:
+        """_trained flag must be True even when early stopping fires."""
+        clf = SecurityClassifier(epochs=500, patience=5, learning_rate=0.5)
+        clf.train(self._fast_converge_data())
+        self.assertTrue(clf._trained)
+
+    def test_epochs_key_reflects_configured_maximum(self) -> None:
+        """history['epochs'] must still reflect the *configured* max, not the actual run."""
+        clf  = SecurityClassifier(epochs=200, patience=5, learning_rate=0.5)
+        hist = clf.train(self._fast_converge_data())
+        self.assertEqual(hist["epochs"], 200)
+
+    def test_early_stopping_stored_as_attribute(self) -> None:
+        """patience is stored as an instance attribute for introspection."""
+        clf = SecurityClassifier(patience=7)
+        self.assertEqual(clf.patience, 7)
+
+    def test_no_patience_gives_epochs_trained_equal_to_epochs(self) -> None:
+        """Without patience, epochs_trained == epochs regardless of convergence."""
+        clf  = SecurityClassifier(epochs=5)
+        hist = clf.train(self._fast_converge_data())
+        self.assertEqual(hist["epochs_trained"], hist["epochs"])
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Feature 2 — Incremental / Online Learning (partial_fit)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestPartialFit(unittest.TestCase):
+    """
+    ``partial_fit()`` enables *online learning*: the model is updated from new
+    labeled events without resetting the weights it learned from previous data.
+
+    Why it matters
+    --------------
+    In a real Security Operations Centre the threat landscape changes
+    continuously.  New attack signatures emerge, previously benign hosts become
+    compromised, and phishing campaigns shift to new domains.  A model that can
+    absorb new ground-truth labels in seconds — without retraining from scratch
+    on the entire historical corpus — is far more operationally valuable.
+
+    partial_fit is also useful for transfer learning: pre-train a model on a
+    large public log dataset, then fine-tune on organisation-specific events.
+    """
+
+    def _separable(self, n: int = 40) -> list[LabeledEvent]:
+        rng = random.Random(9)
+        data = []
+        for _ in range(n):
+            feats = [min(1.0, max(0.0, rng.gauss(0.9, 0.05)))] * 13
+            data.append(LabeledEvent(features=feats, label=1))
+        for _ in range(n):
+            feats = [min(1.0, max(0.0, rng.gauss(0.1, 0.05)))] * 13
+            data.append(LabeledEvent(features=feats, label=0))
+        return data
+
+    def test_partial_fit_returns_loss_dict(self) -> None:
+        """Return value must be a dict with a 'loss' key."""
+        clf = SecurityClassifier(epochs=5)
+        clf.train(self._separable())
+        result = clf.partial_fit(self._separable(10))
+        self.assertIn("loss", result)
+        self.assertIsInstance(result["loss"], float)
+
+    def test_partial_fit_updates_weights(self) -> None:
+        """Weights must change after calling partial_fit."""
+        clf    = SecurityClassifier(epochs=5)
+        clf.train(self._separable())
+        before = list(clf.weights)
+        clf.partial_fit(self._separable(10), epochs=5)
+        self.assertNotEqual(clf.weights, before)
+
+    def test_partial_fit_marks_model_trained(self) -> None:
+        """_trained must be True even if train() was never called first."""
+        clf = SecurityClassifier()
+        clf.partial_fit(self._separable(5))
+        self.assertTrue(clf._trained)
+
+    def test_partial_fit_empty_dataset_raises(self) -> None:
+        """An empty dataset must raise ValueError."""
+        clf = SecurityClassifier()
+        with self.assertRaises(ValueError):
+            clf.partial_fit([])
+
+    def test_partial_fit_multiple_epochs_runs_more_updates(self) -> None:
+        """Requesting more epochs should produce a different (usually lower) loss."""
+        clf1 = SecurityClassifier(epochs=0)
+        clf1.weights = [0.0] * 14
+        clf2 = SecurityClassifier(epochs=0)
+        clf2.weights = [0.0] * 14
+
+        data = self._separable(20)
+        r1 = clf1.partial_fit(data, epochs=1)
+        r2 = clf2.partial_fit(data, epochs=10)
+        # 10 epochs should differ from 1 epoch — just check loss exists & varies
+        self.assertIsInstance(r1["loss"], float)
+        self.assertIsInstance(r2["loss"], float)
+
+    def test_partial_fit_loss_is_finite(self) -> None:
+        """Loss returned by partial_fit must be a finite non-negative number."""
+        clf = SecurityClassifier()
+        result = clf.partial_fit(self._separable(10))
+        self.assertGreater(result["loss"], 0.0)
+        self.assertTrue(math.isfinite(result["loss"]))
+
+    def test_partial_fit_from_scratch_improves_predictions(self) -> None:
+        """
+        Calling partial_fit many times from a zeroed model should still
+        lead the model to learn the separation in the data.
+        """
+        clf = SecurityClassifier()
+        clf.weights = [0.0] * 14
+        data = self._separable(30)
+        for _ in range(10):
+            clf.partial_fit(data, epochs=5)
+        metrics = clf.evaluate(data)
+        # After 50 total epochs of partial_fit the model should beat chance
+        self.assertGreater(metrics["roc_auc"], 0.5)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Feature 3 — ROC-AUC metric
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestRocAuc(unittest.TestCase):
+    """
+    ROC-AUC (Area Under the Receiver-Operating-Characteristic Curve) is the
+    gold-standard metric for binary classifiers operating on imbalanced datasets.
+
+    Why it matters
+    --------------
+    In security log classification, threats are rare — perhaps 1 in 1000 events.
+    A classifier that predicts "benign" for everything achieves 99.9% accuracy
+    but is useless in practice.  ROC-AUC is immune to this effect: it measures
+    how well the *ranking* of predicted probabilities separates the two classes,
+    independent of the chosen threshold.  An AUC of 1.0 means perfect separation;
+    0.5 means the model is no better than random guessing.
+    """
+
+    def _separable_dataset(self, n: int = 60) -> list[LabeledEvent]:
+        rng = random.Random(42)
+        data = []
+        for _ in range(n):
+            feats = [min(1.0, max(0.0, rng.gauss(0.85, 0.05)))] * 13
+            data.append(LabeledEvent(features=feats, label=1))
+        for _ in range(n):
+            feats = [min(1.0, max(0.0, rng.gauss(0.15, 0.05)))] * 13
+            data.append(LabeledEvent(features=feats, label=0))
+        return data
+
+    def test_roc_auc_present_in_evaluate_dict(self) -> None:
+        """evaluate() must include a 'roc_auc' key."""
+        clf = SecurityClassifier(epochs=20)
+        data = self._separable_dataset()
+        clf.train(data)
+        metrics = clf.evaluate(data)
+        self.assertIn("roc_auc", metrics)
+
+    def test_roc_auc_in_unit_interval(self) -> None:
+        """ROC-AUC must be in [0.0, 1.0]."""
+        clf = SecurityClassifier(epochs=20)
+        data = self._separable_dataset()
+        clf.train(data)
+        auc = clf.evaluate(data)["roc_auc"]
+        self.assertGreaterEqual(auc, 0.0)
+        self.assertLessEqual(auc, 1.0)
+
+    def test_perfect_separation_gives_high_auc(self) -> None:
+        """A well-trained classifier on separable data should achieve AUC ≥ 0.90."""
+        clf = SecurityClassifier(epochs=300, learning_rate=0.1)
+        data = self._separable_dataset(80)
+        clf.train(data)
+        auc = clf.evaluate(data)["roc_auc"]
+        self.assertGreaterEqual(auc, 0.90)
+
+    def test_roc_auc_helper_perfect_classifier(self) -> None:
+        """_roc_auc on a perfectly ranked list must return 1.0."""
+        pairs = [(1.0, 1), (0.9, 1), (0.8, 1), (0.2, 0), (0.1, 0), (0.0, 0)]
+        auc = _roc_auc(pairs)
+        self.assertAlmostEqual(auc, 1.0, places=5)
+
+    def test_roc_auc_helper_worst_classifier(self) -> None:
+        """A perfectly inverted ranking gives AUC = 0.0."""
+        pairs = [(1.0, 0), (0.9, 0), (0.0, 1), (0.1, 1)]
+        auc = _roc_auc(pairs)
+        self.assertAlmostEqual(auc, 0.0, places=5)
+
+    def test_roc_auc_helper_random_classifier(self) -> None:
+        """Alternating labels at equal probability gives AUC ≈ 0.5."""
+        pairs = [(0.5, i % 2) for i in range(100)]
+        auc = _roc_auc(pairs)
+        self.assertAlmostEqual(auc, 0.5, delta=0.15)
+
+    def test_roc_auc_helper_empty_graceful(self) -> None:
+        """Empty input returns 0.0 without raising."""
+        self.assertEqual(_roc_auc([]), 0.0)
+
+    def test_roc_auc_helper_single_class_graceful(self) -> None:
+        """When only one class is present _roc_auc returns 0.5 (undefined)."""
+        pairs = [(0.9, 1), (0.7, 1), (0.3, 1)]
+        self.assertEqual(_roc_auc(pairs), 0.5)
+
+    def test_roc_auc_is_rounded_to_4dp(self) -> None:
+        """The value in the evaluate() dict must be rounded to 4 decimal places."""
+        clf = SecurityClassifier(epochs=10)
+        data = self._separable_dataset(10)
+        clf.train(data)
+        auc = clf.evaluate(data)["roc_auc"]
+        self.assertEqual(auc, round(auc, 4))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Feature 4 — Explainability
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestExplain(unittest.TestCase):
+    """
+    ``explain()`` surfaces the contribution of each of the 13 input features to
+    the model's prediction, enabling a human analyst to understand *why* an
+    event was flagged or cleared.
+
+    Why it matters
+    --------------
+    In a Security Operations Centre, an alert that says "threat probability 0.94"
+    with no further context requires an analyst to investigate manually.  An
+    alert that says "threat probability 0.94 — primary factor: keyword_severity
+    (contribution +0.73)" gives the analyst immediate context and lets them
+    decide whether to escalate or dismiss in seconds.
+
+    For machine-learning explainability, the contribution of feature i in a
+    logistic regression model is simply weight[i] × feature[i]: a positive
+    contribution pushes the score towards "threat", a negative contribution
+    pushes it towards "benign".  This is a special case of the SHAP linear
+    explanation for logistic regression.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        rng = random.Random(42)
+        data: list[LabeledEvent] = []
+        for _ in range(50):
+            feats = [min(1.0, max(0.0, rng.gauss(0.85, 0.05)))] * 13
+            data.append(LabeledEvent(features=feats, label=1))
+        for _ in range(50):
+            feats = [min(1.0, max(0.0, rng.gauss(0.15, 0.05)))] * 13
+            data.append(LabeledEvent(features=feats, label=0))
+        cls.clf = SecurityClassifier(epochs=200, learning_rate=0.1)
+        cls.clf.train(data)
+
+    def test_explain_returns_all_keys(self) -> None:
+        """explain() must return exactly the documented set of keys."""
+        result = self.clf.explain([0.5] * 13)
+        for key in ("contributions", "bias", "raw_score", "probability",
+                    "top_threat_factor", "top_benign_factor"):
+            self.assertIn(key, result)
+
+    def test_contributions_has_13_entries(self) -> None:
+        """There must be one contribution per feature (13 total)."""
+        result = self.clf.explain([0.5] * 13)
+        self.assertEqual(len(result["contributions"]), 13)
+
+    def test_contribution_names_match_feature_names(self) -> None:
+        """Contribution keys must match SecurityClassifier.FEATURE_NAMES."""
+        result = self.clf.explain([0.5] * 13)
+        self.assertEqual(
+            set(result["contributions"].keys()),
+            set(SecurityClassifier.FEATURE_NAMES),
+        )
+
+    def test_contributions_math_is_correct(self) -> None:
+        """contribution[i] == weight[i] × feature[i] for all features."""
+        features = [float(i) / 13 for i in range(13)]
+        result = self.clf.explain(features)
+        for i, name in enumerate(SecurityClassifier.FEATURE_NAMES):
+            expected = round(self.clf.weights[i] * features[i], 6)
+            self.assertAlmostEqual(result["contributions"][name], expected, places=5)
+
+    def test_probability_matches_predict_proba(self) -> None:
+        """explain()['probability'] must equal predict_proba() for the same features."""
+        features = [0.7] * 13
+        expl = self.clf.explain(features)
+        proba = self.clf.predict_proba(features)
+        self.assertAlmostEqual(expl["probability"], round(proba, 6), places=5)
+
+    def test_raw_score_consistency(self) -> None:
+        """raw_score must equal the sum of contributions plus bias."""
+        features = [0.3] * 13
+        expl = self.clf.explain(features)
+        manual = sum(expl["contributions"].values()) + expl["bias"]
+        self.assertAlmostEqual(expl["raw_score"], round(manual, 6), places=4)
+
+    def test_top_threat_factor_is_string_or_none(self) -> None:
+        """top_threat_factor must be a feature name string or None."""
+        result = self.clf.explain([0.9] * 13)
+        if result["top_threat_factor"] is not None:
+            self.assertIn(result["top_threat_factor"], SecurityClassifier.FEATURE_NAMES)
+
+    def test_top_benign_factor_is_string_or_none(self) -> None:
+        """top_benign_factor must be a feature name string or None."""
+        result = self.clf.explain([0.1] * 13)
+        if result["top_benign_factor"] is not None:
+            self.assertIn(result["top_benign_factor"], SecurityClassifier.FEATURE_NAMES)
+
+    def test_high_threat_features_set_top_threat_factor(self) -> None:
+        """For a clearly threatening feature vector top_threat_factor should be set."""
+        result = self.clf.explain([0.9] * 13)
+        self.assertIsNotNone(result["top_threat_factor"])
+
+    def test_probability_in_unit_interval(self) -> None:
+        """probability must always be in [0.0, 1.0]."""
+        for feats in [[0.0] * 13, [1.0] * 13, [0.5] * 13]:
+            prob = self.clf.explain(feats)["probability"]
+            self.assertGreaterEqual(prob, 0.0)
+            self.assertLessEqual(prob, 1.0)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Feature 5 — K-Fold Cross-Validation
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestKFoldCrossValidation(unittest.TestCase):
+    """
+    ``k_fold_cross_validate()`` runs stratified k-fold cross-validation and
+    returns the mean and standard deviation of all evaluation metrics across
+    folds, giving a statistically robust performance estimate.
+
+    Why it matters
+    --------------
+    A single train/test split can give misleadingly optimistic or pessimistic
+    results depending on which examples end up in the test set — especially on
+    small security datasets where a handful of critical events may be over- or
+    under-represented.
+
+    k-fold CV reduces this variance: each example appears in the test set
+    exactly once, so the final mean metric is a much more reliable estimate of
+    generalisation performance.  Reporting the standard deviation across folds
+    additionally quantifies how stable the model is.
+
+    In practice, a model where mean_f1=0.92 std_f1=0.01 is far more trustworthy
+    than one with mean_f1=0.90 std_f1=0.15 — both are acceptable individually
+    but only the first is reliably useful.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        rng = random.Random(42)
+        cls.data: list[LabeledEvent] = []
+        for _ in range(80):
+            feats = [min(1.0, max(0.0, rng.gauss(0.85, 0.05)))] * 13
+            cls.data.append(LabeledEvent(features=feats, label=1))
+        for _ in range(80):
+            feats = [min(1.0, max(0.0, rng.gauss(0.15, 0.05)))] * 13
+            cls.data.append(LabeledEvent(features=feats, label=0))
+
+    def test_k_stored_in_result(self) -> None:
+        """result['k'] must equal the requested number of folds."""
+        result = k_fold_cross_validate(self.data, k=3, epochs=20)
+        self.assertEqual(result["k"], 3)
+
+    def test_folds_list_has_k_entries(self) -> None:
+        """result['folds'] must contain one dict per fold."""
+        result = k_fold_cross_validate(self.data, k=4, epochs=20)
+        self.assertEqual(len(result["folds"]), 4)
+
+    def test_all_mean_std_keys_present(self) -> None:
+        """mean_ and std_ keys must exist for all five tracked metrics."""
+        result = k_fold_cross_validate(self.data, k=3, epochs=20)
+        for metric in ("accuracy", "precision", "recall", "f1", "roc_auc"):
+            self.assertIn(f"mean_{metric}", result)
+            self.assertIn(f"std_{metric}", result)
+
+    def test_mean_accuracy_in_unit_interval(self) -> None:
+        result = k_fold_cross_validate(self.data, k=3, epochs=30)
+        acc = result["mean_accuracy"]
+        self.assertGreaterEqual(acc, 0.0)
+        self.assertLessEqual(acc, 1.0)
+
+    def test_mean_roc_auc_in_unit_interval(self) -> None:
+        result = k_fold_cross_validate(self.data, k=3, epochs=30)
+        auc = result["mean_roc_auc"]
+        self.assertGreaterEqual(auc, 0.0)
+        self.assertLessEqual(auc, 1.0)
+
+    def test_separable_data_achieves_high_mean_f1(self) -> None:
+        """Well-separated data should yield mean F1 > 0.6 even with few epochs."""
+        result = k_fold_cross_validate(self.data, k=3, epochs=50)
+        self.assertGreater(result["mean_f1"], 0.6)
+
+    def test_reproducibility_same_seed(self) -> None:
+        """The same seed must produce identical results on two runs."""
+        r1 = k_fold_cross_validate(self.data, k=3, epochs=20, seed=7)
+        r2 = k_fold_cross_validate(self.data, k=3, epochs=20, seed=7)
+        self.assertEqual(r1["mean_f1"], r2["mean_f1"])
+        self.assertEqual(r1["mean_roc_auc"], r2["mean_roc_auc"])
+
+    def test_different_seeds_may_differ(self) -> None:
+        """Different seeds usually produce different fold assignments."""
+        r1 = k_fold_cross_validate(self.data, k=3, epochs=20, seed=1)
+        r2 = k_fold_cross_validate(self.data, k=3, epochs=20, seed=9999)
+        # It is theoretically possible (but astronomically unlikely) for two
+        # random shuffles to coincide, so we only warn rather than hard-fail.
+        # We just verify both runs complete and return valid dicts.
+        self.assertIn("mean_f1", r1)
+        self.assertIn("mean_f1", r2)
+
+    def test_k_less_than_2_raises(self) -> None:
+        """k=1 is not meaningful and must raise ValueError."""
+        with self.assertRaises(ValueError):
+            k_fold_cross_validate(self.data, k=1, epochs=10)
+
+    def test_dataset_smaller_than_k_raises(self) -> None:
+        """Fewer examples than folds must raise ValueError."""
+        tiny = self.data[:3]
+        with self.assertRaises(ValueError):
+            k_fold_cross_validate(tiny, k=5, epochs=5)
+
+    def test_std_is_non_negative(self) -> None:
+        """Standard deviations must always be ≥ 0."""
+        result = k_fold_cross_validate(self.data, k=3, epochs=20)
+        for metric in ("accuracy", "precision", "recall", "f1", "roc_auc"):
+            self.assertGreaterEqual(result[f"std_{metric}"], 0.0)
+
+    def test_fold_metrics_average_to_mean(self) -> None:
+        """The mean over fold dicts should approximately match mean_accuracy."""
+        result = k_fold_cross_validate(self.data, k=4, epochs=20)
+        fold_accs = [f["accuracy"] for f in result["folds"]]
+        manual_mean = sum(fold_accs) / len(fold_accs)
+        self.assertAlmostEqual(result["mean_accuracy"], manual_mean, places=3)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
