@@ -48,7 +48,10 @@ import re
 import socket
 import os
 from dataclasses import dataclass, field
-from typing import Union
+from typing import TYPE_CHECKING, Union
+
+if TYPE_CHECKING:
+    import pandas as pd  # noqa: F401 (type-checking only)
 
 from .threat_detector import ThreatReport, ThreatLevel
 from .email_scanner   import EmailScanResult
@@ -339,6 +342,135 @@ class SiemExporter:
         finally:
             sock.close()
         return sent
+
+    # ------------------------------------------------------------------
+    # pandas-backed analytics
+    # ------------------------------------------------------------------
+
+    def to_dataframe(self, items: list[Exportable]) -> "pd.DataFrame":
+        """
+        Convert *items* to a :class:`pandas.DataFrame` for downstream
+        analytics, filtering, or reporting.
+
+        Each row corresponds to one finding.  Columns differ slightly by
+        finding type but always include:
+
+        * ``item_type``    — ``"ThreatReport"`` | ``"EmailScanResult"`` | ``"AttackCampaign"``
+        * ``threat_level`` — string severity label
+        * ``source``       — source IP / sender / attacker IP
+        * ``score``        — normalised anomaly / risk score (0.0–1.0)
+        * ``signatures``   — pipe-joined signature or indicator names
+        * ``description``  — event type / subject / summary
+
+        Requires pandas to be installed.
+
+        Args:
+            items: List of :class:`ThreatReport`, :class:`EmailScanResult`,
+                   or :class:`AttackCampaign` objects.
+
+        Returns:
+            :class:`pandas.DataFrame` with one row per item.
+
+        Raises:
+            ImportError: If pandas is not installed.
+
+        Example
+        -------
+        ::
+
+            exporter = SiemExporter()
+            df = exporter.to_dataframe(reports + email_results)
+            high_risk = df[df["score"] > 0.7]
+            print(df.groupby(["item_type", "threat_level"]).size())
+        """
+        try:
+            import pandas as pd  # noqa: PLC0415
+        except ImportError as exc:  # pragma: no cover
+            raise ImportError("pandas is required for SiemExporter.to_dataframe().") from exc
+
+        rows: list[dict] = []
+        for item in items:
+            if isinstance(item, ThreatReport):
+                ev = item.event
+                rows.append({
+                    "item_type":    "ThreatReport",
+                    "threat_level": item.threat_level.value,
+                    "source":       ev.source_ip or "",
+                    "score":        item.anomaly_score,
+                    "signatures":   "|".join(ev.matched_sigs),
+                    "description":  ev.event_type,
+                })
+            elif isinstance(item, EmailScanResult):
+                rows.append({
+                    "item_type":    "EmailScanResult",
+                    "threat_level": item.threat_level.value,
+                    "source":       item.email.sender or "",
+                    "score":        item.risk_score,
+                    "signatures":   "|".join(i.name for i in item.indicators),
+                    "description":  item.email.subject or "",
+                })
+            elif isinstance(item, AttackCampaign):
+                rows.append({
+                    "item_type":    "AttackCampaign",
+                    "threat_level": item.severity.value,
+                    "source":       item.attacker_ip or "",
+                    "score":        item.event_count / max(1, item.event_count),
+                    "signatures":   "|".join(item.signatures or []),
+                    "description":  item.summary(),
+                })
+
+        if not rows:
+            return pd.DataFrame(
+                columns=["item_type", "threat_level", "source",
+                         "score", "signatures", "description"]
+            )
+        return pd.DataFrame(rows)
+
+    def summary_stats(self, items: list[Exportable]) -> "pd.DataFrame":
+        """
+        Compute aggregate statistics over *items* grouped by
+        ``(item_type, threat_level)``.
+
+        Returns a :class:`pandas.DataFrame` with columns:
+
+        * ``item_type``, ``threat_level`` — grouping keys
+        * ``count``        — number of findings in this group
+        * ``mean_score``   — mean anomaly/risk score
+        * ``max_score``    — maximum score in the group
+        * ``unique_sources`` — count of distinct source IPs / senders
+
+        Requires pandas to be installed.
+
+        Args:
+            items: List of exportable findings.
+
+        Returns:
+            Grouped summary :class:`pandas.DataFrame`.
+
+        Raises:
+            ImportError: If pandas is not installed.
+        """
+        import pandas as pd  # noqa: PLC0415
+
+        df = self.to_dataframe(items)
+        if df.empty:
+            return pd.DataFrame(
+                columns=["item_type", "threat_level", "count",
+                         "mean_score", "max_score", "unique_sources"]
+            )
+
+        agg = (
+            df.groupby(["item_type", "threat_level"], as_index=False)
+            .agg(
+                count=("score", "count"),
+                mean_score=("score", "mean"),
+                max_score=("score", "max"),
+                unique_sources=("source", "nunique"),
+            )
+        )
+        agg["mean_score"] = agg["mean_score"].round(4)
+        agg["max_score"]  = agg["max_score"].round(4)
+        return agg
 
     # ------------------------------------------------------------------
     # Internal builders — ThreatReport

@@ -268,3 +268,260 @@ def analyze_log_file(path: str) -> list[SecurityEvent]:
         lines = fh.readlines()
     analyzer = EventAnalyzer()
     return analyzer.parse_bulk(lines)
+
+
+# ---------------------------------------------------------------------------
+# Capstone-backed shellcode detector
+# ---------------------------------------------------------------------------
+
+# Dangerous instruction mnemonics that indicate potentially hostile shellcode
+_DANGEROUS_MNEMONICS: frozenset[str] = frozenset({
+    # syscall / interrupt instructions
+    "syscall", "sysenter", "int",
+    # Indirect calls / jumps often used in shellcode stagers
+    "call", "jmp",
+    # Stack manipulation typical of ROP / shellcode setup
+    "push", "pop",
+    # Shell-opening: execve / exec syscall setup
+    "xor",
+})
+
+# Suspicious byte sequences encoded as hex sub-strings (architecture-agnostic)
+_HEX_SHELLCODE_INDICATORS: list[str] = [
+    "90" * 8,           # NOP sled ≥ 8 bytes
+    "cc" * 4,           # INT3 breakpoint sequence
+    "eb",               # short JMP
+]
+
+
+def detect_shellcode(
+    data: bytes,
+    arch: str = "x86_64",
+    min_instructions: int = 3,
+) -> dict:
+    """
+    Disassemble *data* with Capstone and analyse the instruction stream for
+    shellcode-like patterns.
+
+    This function extends :class:`EventAnalyzer` with binary-aware detection
+    so that log lines carrying hex-encoded payloads (e.g. IDS alerts, WAF
+    logs) can be assessed for embedded shellcode.
+
+    Parameters
+    ----------
+    data:
+        Raw bytes to analyse (e.g. from ``bytes.fromhex(hex_string)``).
+    arch:
+        Target architecture: ``"x86_64"`` (default), ``"x86"``,
+        ``"arm"``, or ``"arm64"``.
+    min_instructions:
+        Minimum valid instructions required to attempt pattern analysis.
+        Payloads that disassemble into fewer valid instructions are
+        classified as ``"BINARY_DATA"`` rather than shellcode candidates.
+
+    Returns
+    -------
+    dict with keys:
+
+    * ``"classification"`` — ``"BENIGN"`` | ``"SUSPICIOUS"`` | ``"MALICIOUS"`` | ``"BINARY_DATA"``
+    * ``"arch"``           — the architecture string used
+    * ``"n_instructions"`` — number of valid decoded instructions
+    * ``"dangerous_mnemonics"`` — set of dangerous mnemonics found
+    * ``"indicators"``     — list of human-readable indicator strings
+    * ``"disassembly"``    — list of ``{"address", "mnemonic", "op_str"}`` dicts
+
+    Raises
+    ------
+    ImportError
+        If capstone is not installed.
+
+    Example
+    -------
+    ::
+
+        result = detect_shellcode(bytes.fromhex("4831c048 89c7b03b 0f05"))
+        print(result["classification"])   # → "MALICIOUS"
+    """
+    try:
+        import capstone  # noqa: PLC0415
+    except ImportError as exc:  # pragma: no cover
+        raise ImportError("capstone is required for detect_shellcode().") from exc
+
+    # Select Capstone architecture + mode
+    arch_map = {
+        "x86_64": (capstone.CS_ARCH_X86, capstone.CS_MODE_64),
+        "x86":    (capstone.CS_ARCH_X86, capstone.CS_MODE_32),
+        "arm":    (capstone.CS_ARCH_ARM, capstone.CS_MODE_ARM),
+        "arm64":  (capstone.CS_ARCH_ARM64, capstone.CS_MODE_ARM),
+    }
+    cs_arch, cs_mode = arch_map.get(arch, (capstone.CS_ARCH_X86, capstone.CS_MODE_64))
+    md = capstone.Cs(cs_arch, cs_mode)
+    md.detail = False
+
+    instructions: list[dict] = []
+    for insn in md.disasm(data, 0x1000):
+        instructions.append({
+            "address":  insn.address,
+            "mnemonic": insn.mnemonic,
+            "op_str":   insn.op_str,
+        })
+
+    n_instructions   = len(instructions)
+    indicators:       list[str] = []
+    dangerous_found:  set[str]  = set()
+
+    if n_instructions < min_instructions:
+        return {
+            "classification":    "BINARY_DATA",
+            "arch":              arch,
+            "n_instructions":    n_instructions,
+            "dangerous_mnemonics": set(),
+            "indicators":        ["Insufficient valid instructions for shellcode analysis"],
+            "disassembly":       instructions,
+        }
+
+    # Check for dangerous mnemonics
+    for insn in instructions:
+        m = insn["mnemonic"].lower().split()[0]
+        if m in _DANGEROUS_MNEMONICS:
+            dangerous_found.add(m)
+
+    # Check for hex-level indicators
+    hex_data = data.hex()
+    for indicator_hex in _HEX_SHELLCODE_INDICATORS:
+        if indicator_hex in hex_data:
+            indicators.append(f"Hex pattern detected: {indicator_hex}")
+
+    # Heuristic: syscall/interrupt + xor (zero-register) strongly indicates shellcode
+    has_syscall  = bool({"syscall", "sysenter", "int"} & dangerous_found)
+    has_xor      = "xor" in dangerous_found
+    has_call_jmp = bool({"call", "jmp"} & dangerous_found)
+
+    # Derive classification
+    score = 0
+    if has_syscall:
+        score += 3
+        indicators.append("Syscall/interrupt instruction detected (strong shellcode indicator)")
+    if has_xor:
+        score += 1
+        indicators.append("XOR instruction present (register zeroing / obfuscation)")
+    if has_call_jmp:
+        score += 1
+        indicators.append("Indirect CALL/JMP present (typical shellcode stager pattern)")
+    if indicators:
+        # Count existing hex-pattern hits already in indicators
+        score += sum(1 for ind in indicators if "Hex pattern" in ind)
+
+    if score >= 4:
+        classification = "MALICIOUS"
+    elif score >= 2:
+        classification = "SUSPICIOUS"
+    else:
+        classification = "BENIGN"
+
+    return {
+        "classification":     classification,
+        "arch":               arch,
+        "n_instructions":     n_instructions,
+        "dangerous_mnemonics": dangerous_found,
+        "indicators":         indicators,
+        "disassembly":        instructions,
+    }
+
+
+# Attach as a method on EventAnalyzer for ergonomic access
+EventAnalyzer.detect_shellcode = staticmethod(detect_shellcode)  # type: ignore[attr-defined]
+
+
+# ---------------------------------------------------------------------------
+# YARA-backed event analyzer
+# ---------------------------------------------------------------------------
+
+class YaraEventAnalyzer(EventAnalyzer):
+    """
+    An :class:`EventAnalyzer` subclass that augments the built-in regex
+    signature library with user-supplied YARA rules.
+
+    When a log line's raw text matches a YARA rule the rule name is appended
+    to :attr:`~SecurityEvent.matched_sigs` with a ``"YARA:"`` prefix, and the
+    severity is boosted proportionally to the number of YARA matches.
+
+    Parameters
+    ----------
+    rules_source:
+        A YARA rules string (passed to ``yara.compile(source=…)``).  Either
+        *rules_source* or *rules_filepath* must be provided.
+    rules_filepath:
+        Path to a ``.yar`` / ``.yara`` rules file (passed to
+        ``yara.compile(filepath=…)``).
+    yara_severity_boost:
+        Amount added to the event's *severity* per YARA match (capped at 1.0).
+        Default 0.25.
+
+    Raises
+    ------
+    ImportError
+        If yara-python is not installed.
+    ValueError
+        If neither *rules_source* nor *rules_filepath* is supplied.
+
+    Example
+    -------
+    ::
+
+        RULES = '''
+        rule SuspiciousBase64 {
+            strings:
+                $b64 = /[A-Za-z0-9+/]{40,}={0,2}/ ascii
+            condition:
+                $b64
+        }
+        '''
+        analyzer = YaraEventAnalyzer(rules_source=RULES)
+        event = analyzer.parse("GET /?cmd=dXNlciBhZGQgSGFja2Vy HTTP/1.1")
+        assert "YARA:SuspiciousBase64" in event.matched_sigs
+    """
+
+    def __init__(
+        self,
+        rules_source: Optional[str] = None,
+        rules_filepath: Optional[str] = None,
+        yara_severity_boost: float = 0.25,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        if rules_source is None and rules_filepath is None:
+            raise ValueError("Provide rules_source or rules_filepath.")
+
+        try:
+            import yara  # noqa: PLC0415
+        except ImportError as exc:  # pragma: no cover
+            raise ImportError("yara-python is required for YaraEventAnalyzer.") from exc
+
+        if rules_source is not None:
+            self._yara_rules = yara.compile(source=rules_source)
+        else:
+            self._yara_rules = yara.compile(filepath=rules_filepath)
+
+        self._yara_boost = yara_severity_boost
+
+    def parse(self, raw: str) -> SecurityEvent:
+        """
+        Parse *raw* as usual, then apply YARA rules to augment signatures.
+
+        Returns the :class:`SecurityEvent` with YARA-matched rule names
+        appended to :attr:`~SecurityEvent.matched_sigs`.
+        """
+        event = super().parse(raw)
+        try:
+            matches = self._yara_rules.match(data=raw.encode(errors="replace"))
+            for m in matches:
+                sig = f"YARA:{m.rule}"
+                if sig not in event.matched_sigs:
+                    event.matched_sigs.append(sig)
+            if matches:
+                boost = min(1.0, self._yara_boost * len(matches))
+                event.severity = round(min(1.0, event.severity + boost), 4)
+        except Exception:  # noqa: BLE001
+            pass  # never let YARA errors propagate
+        return event

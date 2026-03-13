@@ -909,3 +909,450 @@ def _oversample(
         return samples[:target]
     extras = rng.choices(samples, k=target - len(samples))
     return list(samples) + extras
+
+
+# ===========================================================================
+# pandas DataFrame integration for DatasetBuilder
+# ===========================================================================
+
+def _dataset_to_dataframe(dataset: list[LabeledEvent]) -> "pd.DataFrame":
+    """
+    Convert a labeled dataset to a :class:`pandas.DataFrame`.
+
+    Each row is one :class:`LabeledEvent`.  The 13 feature columns use the
+    names from :attr:`SecurityClassifier.FEATURE_NAMES`; the final two columns
+    are ``label`` (int) and ``weight`` (float).
+
+    Requires pandas to be installed.
+    """
+    import pandas as pd  # noqa: PLC0415
+
+    columns = SecurityClassifier.FEATURE_NAMES + ["label", "weight"]
+    rows = [e.features + [e.label, e.weight] for e in dataset]
+    return pd.DataFrame(rows, columns=columns)
+
+
+def _dataset_from_dataframe(df: "pd.DataFrame") -> list[LabeledEvent]:
+    """
+    Build a :class:`LabeledEvent` list from a :class:`pandas.DataFrame`.
+
+    The DataFrame must contain a ``label`` column.  A ``weight`` column is
+    optional (defaults to 1.0).  All other columns are treated as feature
+    dimensions in column order.
+    """
+    import pandas as pd  # noqa: PLC0415
+
+    if "label" not in df.columns:
+        raise ValueError("DataFrame must contain a 'label' column.")
+
+    feature_cols = [c for c in df.columns if c not in ("label", "weight")]
+    has_weight = "weight" in df.columns
+    events: list[LabeledEvent] = []
+    for _, row in df.iterrows():
+        feats = [float(row[c]) for c in feature_cols]
+        label = int(row["label"])
+        weight = float(row["weight"]) if has_weight else 1.0
+        events.append(LabeledEvent(features=feats, label=label, weight=weight))
+    return events
+
+
+# Attach the helpers as static methods on DatasetBuilder for ergonomic access
+DatasetBuilder.to_dataframe = staticmethod(_dataset_to_dataframe)  # type: ignore[attr-defined]
+DatasetBuilder.from_dataframe = staticmethod(_dataset_from_dataframe)  # type: ignore[attr-defined]
+
+
+# ===========================================================================
+# Scikit-learn backed security classifier
+# ===========================================================================
+
+class SklearnSecurityClassifier:
+    """
+    Scikit-learn–backed binary security classifier.
+
+    Wraps :class:`sklearn.ensemble.RandomForestClassifier` (default) or
+    :class:`sklearn.ensemble.GradientBoostingClassifier` and presents the
+    same public interface as :class:`SecurityClassifier` so the two can be
+    used interchangeably in the ML pipeline.
+
+    Advantages over the pure-Python logistic regression:
+
+    * **Higher accuracy** — tree ensembles capture non-linear interactions
+      between features (e.g., a high ``signature_count`` combined with an
+      unusual ``source_ip`` is more suspicious than either alone).
+    * **Built-in feature importance** — :attr:`feature_importances_` exposes
+      which of the 13 dimensions drive the model, replacing the manual
+      weight-inspection needed for the logistic model.
+    * **sklearn pipeline compatibility** — can be composed with
+      ``StandardScaler``, ``Pipeline``, ``GridSearchCV``, etc. from the
+      sklearn ecosystem.
+    * **Calibrated probabilities** — with ``calibrate=True`` the raw ensemble
+      scores are post-hoc calibrated via Platt scaling, improving the
+      reliability of :meth:`predict_proba`.
+
+    Parameters
+    ----------
+    estimator_type:
+        ``"random_forest"`` (default) or ``"gradient_boosting"``.
+    n_estimators:
+        Number of trees in the ensemble.  Default 100.
+    max_depth:
+        Maximum tree depth (``None`` for unlimited).  Default ``None``.
+    random_state:
+        Random seed for reproducibility.  Default 42.
+    calibrate:
+        When ``True``, wrap the estimator in a
+        :class:`~sklearn.calibration.CalibratedClassifierCV` to produce
+        well-calibrated probability estimates.  Default ``False``.
+
+    Example
+    -------
+    ::
+
+        from sentinel_weave.ml_pipeline import (
+            SklearnSecurityClassifier, DatasetBuilder,
+        )
+
+        clf = SklearnSecurityClassifier()
+        clf.train(train_set)
+        proba = clf.predict_proba(event.features)
+        metrics = clf.evaluate(test_set)
+        print(metrics["roc_auc"])
+        print(clf.feature_importances_)
+    """
+
+    FEATURE_NAMES: list[str] = SecurityClassifier.FEATURE_NAMES
+
+    def __init__(
+        self,
+        estimator_type: str = "random_forest",
+        n_estimators: int = 100,
+        max_depth: Optional[int] = None,
+        random_state: int = 42,
+        calibrate: bool = False,
+    ) -> None:
+        self.estimator_type = estimator_type
+        self.n_estimators   = n_estimators
+        self.max_depth      = max_depth
+        self.random_state   = random_state
+        self.calibrate      = calibrate
+        self._trained       = False
+        self._model         = None          # set by train()
+        self._importances: list[float] = []
+
+    # ------------------------------------------------------------------
+    # Training
+    # ------------------------------------------------------------------
+
+    def train(self, dataset: list[LabeledEvent]) -> dict:
+        """
+        Train the sklearn estimator on *dataset*.
+
+        Args:
+            dataset: Labeled training examples.
+
+        Returns:
+            Training summary dict:
+            ``{"n_samples", "n_features", "estimator_type",
+               "n_estimators", "oob_score"}`` where ``oob_score`` is
+            ``None`` for gradient boosting (no OOB estimate).
+
+        Raises:
+            ValueError: If *dataset* is empty or if both classes are absent.
+            ImportError: If scikit-learn is not installed.
+        """
+        if not dataset:
+            raise ValueError("Cannot train on an empty dataset.")
+
+        try:
+            from sklearn.ensemble import (  # noqa: PLC0415
+                GradientBoostingClassifier,
+                RandomForestClassifier,
+            )
+            from sklearn.calibration import CalibratedClassifierCV  # noqa: PLC0415
+        except ImportError as exc:  # pragma: no cover
+            raise ImportError("scikit-learn is required for SklearnSecurityClassifier.") from exc
+
+        X = [e.features for e in dataset]
+        y = [e.label    for e in dataset]
+        w = [e.weight   for e in dataset]
+
+        if len(set(y)) < 2:
+            raise ValueError("Training dataset must contain both classes (0 and 1).")
+
+        if self.estimator_type == "gradient_boosting":
+            base = GradientBoostingClassifier(
+                n_estimators=self.n_estimators,
+                max_depth=self.max_depth or 3,
+                random_state=self.random_state,
+            )
+            oob_score: Optional[float] = None
+        else:
+            base = RandomForestClassifier(
+                n_estimators=self.n_estimators,
+                max_depth=self.max_depth,
+                random_state=self.random_state,
+                oob_score=True,
+                n_jobs=-1,
+            )
+            oob_score = None  # filled after fit
+
+        if self.calibrate:
+            model = CalibratedClassifierCV(base, cv=3, method="sigmoid")
+            model.fit(X, y, sample_weight=w)
+            self._model = model
+            # Feature importances not directly available after calibration wrapping
+            self._importances = [0.0] * len(self.FEATURE_NAMES)
+        else:
+            base.fit(X, y, sample_weight=w)
+            self._model = base
+            raw_imp = getattr(base, "feature_importances_", [])
+            self._importances = [round(float(v), 6) for v in raw_imp]
+            if self.estimator_type == "random_forest":
+                oob_score = round(float(base.oob_score_), 4)
+
+        self._trained = True
+        return {
+            "n_samples":      len(dataset),
+            "n_features":     len(X[0]) if X else 0,
+            "estimator_type": self.estimator_type,
+            "n_estimators":   self.n_estimators,
+            "oob_score":      oob_score,
+        }
+
+    # ------------------------------------------------------------------
+    # Prediction
+    # ------------------------------------------------------------------
+
+    def predict_proba(self, features: list[float]) -> float:
+        """
+        Return the probability that *features* represents a threat (class 1).
+
+        Args:
+            features: A 13-element float feature vector.
+
+        Returns:
+            Probability in [0.0, 1.0].
+
+        Raises:
+            RuntimeError: If the model has not been trained yet.
+        """
+        if not self._trained or self._model is None:
+            raise RuntimeError("Model must be trained before prediction.")
+        proba = self._model.predict_proba([features])[0]
+        # proba is [p_class0, p_class1]; return p_class1
+        return float(proba[1])
+
+    def predict(self, features: list[float], threshold: float = 0.5) -> int:
+        """
+        Binary prediction for *features*.
+
+        Args:
+            features:  13-element float feature vector.
+            threshold: Decision boundary.  Default 0.5.
+
+        Returns:
+            1 (threat) or 0 (benign).
+        """
+        return 1 if self.predict_proba(features) >= threshold else 0
+
+    # ------------------------------------------------------------------
+    # Evaluation
+    # ------------------------------------------------------------------
+
+    def evaluate(
+        self,
+        test_set: list[LabeledEvent],
+        threshold: float = 0.5,
+    ) -> dict:
+        """
+        Evaluate the model on *test_set*.
+
+        Returns the same metrics dict as :meth:`SecurityClassifier.evaluate`:
+        ``{"accuracy", "precision", "recall", "f1", "roc_auc",
+           "tp", "fp", "tn", "fn"}``.
+
+        Uses pandas and sklearn for efficient metric computation if available;
+        falls back to pure-Python computation otherwise.
+
+        Raises:
+            RuntimeError: If the model has not been trained.
+            ValueError: If *test_set* is empty.
+        """
+        if not self._trained or self._model is None:
+            raise RuntimeError("Model must be trained before evaluation.")
+        if not test_set:
+            raise ValueError("test_set must not be empty.")
+
+        try:
+            from sklearn.metrics import (  # noqa: PLC0415
+                roc_auc_score,
+                accuracy_score,
+                precision_score,
+                recall_score,
+                f1_score,
+                confusion_matrix,
+            )
+            import pandas as pd  # noqa: PLC0415
+
+            df = _dataset_to_dataframe(test_set)
+            feature_cols = self.FEATURE_NAMES
+            X = df[feature_cols].values.tolist()
+            y_true = df["label"].tolist()
+
+            y_pred  = [self.predict(x, threshold) for x in X]
+            y_proba = [self.predict_proba(x) for x in X]
+
+            cm = confusion_matrix(y_true, y_pred, labels=[0, 1])
+            tn, fp, fn, tp = int(cm[0, 0]), int(cm[0, 1]), int(cm[1, 0]), int(cm[1, 1])
+
+            n_classes = len(set(y_true))
+            roc_auc_val = (
+                round(float(roc_auc_score(y_true, y_proba)), 4)
+                if n_classes >= 2
+                else 0.5
+            )
+
+            return {
+                "accuracy":  round(float(accuracy_score(y_true, y_pred)), 4),
+                "precision": round(float(precision_score(y_true, y_pred, zero_division=0)), 4),
+                "recall":    round(float(recall_score(y_true, y_pred, zero_division=0)), 4),
+                "f1":        round(float(f1_score(y_true, y_pred, zero_division=0)), 4),
+                "roc_auc":   roc_auc_val,
+                "tp": tp, "fp": fp, "tn": tn, "fn": fn,
+            }
+        except ImportError:  # pragma: no cover
+            # Minimal fallback if sklearn/pandas somehow unavailable
+            tp = fp = tn = fn = 0
+            proba_label = []
+            for e in test_set:
+                pred  = self.predict(e.features, threshold)
+                proba = self.predict_proba(e.features)
+                proba_label.append((proba, e.label))
+                if pred == 1 and e.label == 1:
+                    tp += 1
+                elif pred == 1 and e.label == 0:
+                    fp += 1
+                elif pred == 0 and e.label == 1:
+                    fn += 1
+                else:
+                    tn += 1
+            n = tp + fp + tn + fn
+            accuracy  = (tp + tn) / n if n else 0.0
+            precision = tp / (tp + fp) if (tp + fp) else 0.0
+            recall    = tp / (tp + fn) if (tp + fn) else 0.0
+            f1        = (
+                2 * precision * recall / (precision + recall)
+                if (precision + recall)
+                else 0.0
+            )
+            return {
+                "accuracy":  round(accuracy,  4),
+                "precision": round(precision, 4),
+                "recall":    round(recall,    4),
+                "f1":        round(f1,        4),
+                "roc_auc":   round(_roc_auc(proba_label), 4),
+                "tp": tp, "fp": fp, "tn": tn, "fn": fn,
+            }
+
+    # ------------------------------------------------------------------
+    # Feature importances
+    # ------------------------------------------------------------------
+
+    @property
+    def feature_importances_(self) -> dict[str, float]:
+        """
+        Per-feature importance scores from the fitted ensemble.
+
+        Returns a dict mapping :attr:`FEATURE_NAMES` to their importance
+        values (sum ≈ 1.0 for tree ensembles).  Returns zeros before training
+        or when the estimator does not expose ``feature_importances_``
+        (e.g. after calibration).
+        """
+        if not self._importances:
+            return {name: 0.0 for name in self.FEATURE_NAMES}
+        return dict(zip(self.FEATURE_NAMES, self._importances))
+
+    def top_features(self, n: int = 5) -> list[tuple[str, float]]:
+        """
+        Return the *n* most important feature names and their scores.
+
+        Args:
+            n: Number of top features to return.
+
+        Returns:
+            List of ``(feature_name, importance)`` tuples, sorted descending.
+        """
+        return sorted(
+            self.feature_importances_.items(),
+            key=lambda kv: kv[1],
+            reverse=True,
+        )[:n]
+
+    # ------------------------------------------------------------------
+    # Serialisation helpers
+    # ------------------------------------------------------------------
+
+    def to_json(self) -> str:
+        """
+        Serialise the model to a JSON string using ``pickle`` under the hood.
+
+        .. warning::
+            The resulting JSON contains base64-encoded pickle data.  Do not
+            deserialise untrusted payloads.
+
+        Returns:
+            JSON string suitable for storage or transport.
+        """
+        import pickle  # noqa: PLC0415
+        import base64  # noqa: PLC0415
+
+        payload = {
+            "class":          "SklearnSecurityClassifier",
+            "estimator_type": self.estimator_type,
+            "n_estimators":   self.n_estimators,
+            "max_depth":      self.max_depth,
+            "random_state":   self.random_state,
+            "calibrate":      self.calibrate,
+            "trained":        self._trained,
+            "importances":    self._importances,
+            "model_b64":      (
+                base64.b64encode(pickle.dumps(self._model)).decode()
+                if self._trained
+                else None
+            ),
+        }
+        return json.dumps(payload)
+
+    @classmethod
+    def from_json(cls, data: str) -> "SklearnSecurityClassifier":
+        """
+        Restore a :class:`SklearnSecurityClassifier` from a JSON string
+        produced by :meth:`to_json`.
+
+        Args:
+            data: JSON string from :meth:`to_json`.
+
+        Returns:
+            Fully initialised, trained :class:`SklearnSecurityClassifier`.
+
+        Raises:
+            ValueError: If the JSON is not from a ``SklearnSecurityClassifier``.
+        """
+        import pickle   # noqa: PLC0415
+        import base64   # noqa: PLC0415
+
+        payload = json.loads(data)
+        if payload.get("class") != "SklearnSecurityClassifier":
+            raise ValueError("JSON was not produced by SklearnSecurityClassifier.to_json()")
+        obj = cls(
+            estimator_type=payload["estimator_type"],
+            n_estimators=payload["n_estimators"],
+            max_depth=payload["max_depth"],
+            random_state=payload["random_state"],
+            calibrate=payload["calibrate"],
+        )
+        obj._trained      = payload["trained"]
+        obj._importances  = payload["importances"]
+        if payload.get("model_b64") is not None:
+            obj._model = pickle.loads(base64.b64decode(payload["model_b64"]))  # noqa: S301
+        return obj

@@ -28,7 +28,10 @@ import statistics
 import os
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    import pandas as pd  # noqa: F401 (type-checking only)
 
 from .event_analyzer import SecurityEvent
 
@@ -391,3 +394,270 @@ def summarize_reports(reports: list[ThreatReport]) -> dict:
         "max_score":      round(max(scores), 4),
         "unique_ips":     len(ips),
     }
+
+
+# ---------------------------------------------------------------------------
+# pandas-backed summary helper
+# ---------------------------------------------------------------------------
+
+def summarize_reports_df(reports: list[ThreatReport]) -> "pd.DataFrame":
+    """
+    Convert a list of :class:`ThreatReport` objects to a
+    :class:`pandas.DataFrame` for downstream analytics.
+
+    Each row corresponds to one report and includes:
+
+    * ``threat_level`` — string label (``"BENIGN"``, ``"LOW"``, …)
+    * ``anomaly_score`` — composite 0–1 float
+    * ``source_ip``     — source IP string (empty string when absent)
+    * ``event_type``    — event category (``"AUTH"``, ``"NETWORK"``, …)
+    * ``signatures``    — pipe-joined signature names (e.g. ``"SSH_BRUTE_FORCE|PORT_SCAN"``)
+    * ``azure_score``   — Azure ML model score (NaN when unused)
+    * 13 feature columns with names from :attr:`SecurityClassifier.FEATURE_NAMES
+      <sentinel_weave.ml_pipeline.SecurityClassifier.FEATURE_NAMES>`
+
+    Requires pandas to be installed.
+
+    Args:
+        reports: List of :class:`ThreatReport` objects.
+
+    Returns:
+        :class:`pandas.DataFrame` with one row per report.
+
+    Raises:
+        ImportError: If pandas is not installed.
+
+    Example
+    -------
+    ::
+
+        df = summarize_reports_df(detector.analyze_bulk(events))
+        print(df.groupby("threat_level")["anomaly_score"].mean())
+        high_risk = df[df["anomaly_score"] > 0.7]
+    """
+    try:
+        import pandas as pd  # noqa: PLC0415
+    except ImportError as exc:  # pragma: no cover
+        raise ImportError("pandas is required for summarize_reports_df().") from exc
+
+    _FEATURE_NAMES = [
+        "text_length_norm", "digit_ratio", "special_char_ratio",
+        "uppercase_ratio", "has_source_ip", "has_timestamp",
+        "event_type_encoded", "signature_count_norm", "keyword_severity",
+        "has_path_chars", "text_entropy", "ip_count_norm",
+        "threat_keyword_density",
+    ]
+
+    rows = []
+    for r in reports:
+        feats = r.event.features or []
+        # Pad / trim to 13 to guarantee consistent columns
+        feats_padded = (feats + [0.0] * 13)[:13]
+        row: dict = {
+            "threat_level":  r.threat_level.value,
+            "anomaly_score": r.anomaly_score,
+            "source_ip":     r.event.source_ip or "",
+            "event_type":    r.event.event_type,
+            "signatures":    "|".join(r.event.matched_sigs),
+            "azure_score":   r.azure_score if r.azure_score is not None else float("nan"),
+        }
+        for name, val in zip(_FEATURE_NAMES, feats_padded):
+            row[name] = val
+        rows.append(row)
+
+    if not rows:
+        return pd.DataFrame(
+            columns=["threat_level", "anomaly_score", "source_ip",
+                     "event_type", "signatures", "azure_score"] + _FEATURE_NAMES,
+        )
+    return pd.DataFrame(rows)
+
+
+# ---------------------------------------------------------------------------
+# Isolation Forest anomaly detector (scikit-learn backed)
+# ---------------------------------------------------------------------------
+
+class IsolationForestDetector(ThreatDetector):
+    """
+    Anomaly detector that uses scikit-learn's :class:`~sklearn.ensemble.IsolationForest`
+    in place of the statistical z-score baseline.
+
+    The ``IsolationForest`` is a fully unsupervised algorithm that identifies
+    anomalies by measuring how quickly a random binary tree can *isolate*
+    a sample.  Anomalous samples (with unusual feature combinations) are
+    isolated in fewer splits and therefore receive higher anomaly scores.
+
+    **When to prefer this over the standard** :class:`ThreatDetector`:
+
+    * **High-dimensional interactions** — IsolationForest captures non-linear
+      cross-feature patterns that z-score cannot (e.g. a normally-sized
+      payload is only suspicious when combined with an unusual source port).
+    * **No baseline required** — the model is trained once on a representative
+      corpus; there is no ``min_baseline_samples`` warm-up period.
+    * **Contamination tuning** — the ``contamination`` parameter directly
+      encodes the analyst's prior belief about the fraction of malicious
+      traffic, giving cleaner decision boundaries.
+
+    All other features of :class:`ThreatDetector` (signature matching, keyword
+    severity, Azure ML integration, :meth:`analyze_bulk`, :meth:`top_threats`)
+    are inherited unchanged.
+
+    Parameters
+    ----------
+    n_estimators:
+        Number of isolation trees.  Default 100.
+    contamination:
+        Expected proportion of anomalies (0.0–0.5).  Default 0.05 (5 %).
+    random_state:
+        Reproducibility seed.  Default 42.
+    yara_rules_source:
+        Optional YARA rules string.  When provided, every event's ``raw``
+        text is scanned with these rules; matches are added to
+        ``matched_sigs`` and raise the anomaly score.
+    **kwargs:
+        Forwarded to :class:`ThreatDetector.__init__`.
+
+    Example
+    -------
+    ::
+
+        detector = IsolationForestDetector(contamination=0.03)
+        for event in training_corpus:
+            detector.fit_event(event)
+        detector.fit()
+
+        report = detector.analyze(suspicious_event)
+        print(report.threat_level.value)
+    """
+
+    def __init__(
+        self,
+        n_estimators: int = 100,
+        contamination: float = 0.05,
+        random_state: int = 42,
+        yara_rules_source: Optional[str] = None,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        self._n_estimators   = n_estimators
+        self._contamination  = contamination
+        self._random_state   = random_state
+        self._yara_compiled  = None
+        self._iso_model      = None
+        self._training_X: list[list[float]] = []
+
+        if yara_rules_source is not None:
+            try:
+                import yara  # noqa: PLC0415
+                self._yara_compiled = yara.compile(source=yara_rules_source)
+            except ImportError:  # pragma: no cover
+                pass  # yara not installed; skip rule compilation
+
+    # ------------------------------------------------------------------
+    # Fitting
+    # ------------------------------------------------------------------
+
+    def fit_event(self, event: SecurityEvent) -> None:
+        """
+        Queue *event*'s feature vector for inclusion in the next :meth:`fit`.
+
+        This is analogous to :meth:`ThreatDetector.update_baseline` but
+        accumulates vectors for batch fitting rather than updating incremental
+        statistics.
+        """
+        if event.features:
+            self._training_X.append(list(event.features))
+
+    def fit(self, extra_X: Optional[list[list[float]]] = None) -> int:
+        """
+        Fit the :class:`~sklearn.ensemble.IsolationForest` on accumulated data.
+
+        Must be called once before :meth:`analyze`.  Can be called again to
+        re-train on a larger corpus without losing the accumulated training
+        vectors.
+
+        Args:
+            extra_X: Optional additional raw feature rows to include.
+
+        Returns:
+            Number of training samples used.
+
+        Raises:
+            ValueError: If no training data has been accumulated.
+            ImportError: If scikit-learn is not installed.
+        """
+        try:
+            from sklearn.ensemble import IsolationForest  # noqa: PLC0415
+        except ImportError as exc:  # pragma: no cover
+            raise ImportError("scikit-learn is required for IsolationForestDetector.fit().") from exc
+
+        X = list(self._training_X)
+        if extra_X:
+            X.extend(extra_X)
+        if not X:
+            raise ValueError(
+                "No training data accumulated.  Call fit_event() with representative "
+                "events before calling fit()."
+            )
+
+        self._iso_model = IsolationForest(
+            n_estimators=self._n_estimators,
+            contamination=self._contamination,
+            random_state=self._random_state,
+            n_jobs=-1,
+        )
+        self._iso_model.fit(X)
+        return len(X)
+
+    # ------------------------------------------------------------------
+    # Analysis (override)
+    # ------------------------------------------------------------------
+
+    def analyze(self, event: SecurityEvent) -> ThreatReport:
+        """
+        Analyse *event* using IsolationForest + optional YARA + inherited detectors.
+
+        If the IsolationForest has not been fitted (e.g. during the warm-up
+        phase) the method gracefully falls back to the parent z-score detector.
+
+        YARA scanning (when ``yara_rules_source`` was provided) adds any
+        matching rule names to ``event.matched_sigs``.
+        """
+        # Optional YARA augmentation
+        if self._yara_compiled is not None:
+            try:
+                matches = self._yara_compiled.match(data=event.raw.encode(errors="replace"))
+                for m in matches:
+                    rule_sig = f"YARA:{m.rule}"
+                    if rule_sig not in event.matched_sigs:
+                        event.matched_sigs.append(rule_sig)
+            except Exception:  # noqa: BLE001
+                pass  # never let YARA errors break the pipeline
+
+        # If IsolationForest not yet fitted, fall back to z-score
+        if self._iso_model is None or not event.features:
+            return super().analyze(event)
+
+        # IsolationForest anomaly scoring
+        # score_samples() returns negative values; more negative ⟹ more anomalous
+        # We normalise to [0, 1] where 1 is most anomalous.
+        try:
+            raw_score = float(
+                self._iso_model.score_samples([event.features])[0]
+            )
+            # Typical range is roughly [-0.5, 0.5].  Map to [0, 1]:
+            # normalised = 0.5 - raw_score clamped to [0, 1]
+            iso_anomaly = max(0.0, min(1.0, 0.5 - raw_score))
+        except Exception:  # noqa: BLE001
+            iso_anomaly = 0.0
+
+        # Get the base report (which includes sig + keyword + z-score scoring)
+        report = super().analyze(event)
+
+        # Blend: 50 % IsolationForest score, 50 % existing composite
+        blended = min(1.0, 0.50 * iso_anomaly + 0.50 * report.anomaly_score)
+        report.anomaly_score = round(blended, 4)
+        # Re-derive the threat level from the blended score
+        report.threat_level = ThreatDetector._score_to_level(blended, event)
+        report.explanation.append(f"IsolationForest anomaly score: {iso_anomaly:.4f}")
+        return report

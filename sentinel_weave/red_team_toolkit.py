@@ -1057,3 +1057,268 @@ def summarize_scan(
         "open_ports":   [r.port for r in open_results],
         "services":     {r.port: r.service_hint for r in open_results},
     }
+
+
+# ===========================================================================
+# pandas-backed scan aggregation
+# ===========================================================================
+
+def aggregate_scan_results(
+    port_results: Optional[list[PortScanResult]] = None,
+    vuln_findings: Optional[list["VulnerabilityFinding"]] = None,
+    fingerprints: Optional[list["ServiceFingerprintResult"]] = None,
+) -> "pd.DataFrame":
+    """
+    Aggregate heterogeneous scan results into a single :class:`pandas.DataFrame`
+    for analyst review, reporting, and downstream ML scoring.
+
+    Each row represents one discovery (open port, vulnerability finding, or
+    service fingerprint).  A ``result_type`` column distinguishes the source.
+
+    Columns:
+
+    * ``result_type``   — ``"port_scan"`` | ``"vuln_finding"`` | ``"fingerprint"``
+    * ``host``          — target hostname / IP
+    * ``port``          — TCP/UDP port (0 for host-level findings)
+    * ``is_open``       — bool (only meaningful for ``port_scan`` rows)
+    * ``service``       — detected service name / hint
+    * ``severity``      — ``"CRITICAL"`` / ``"HIGH"`` / ``"MEDIUM"`` / ``"LOW"``
+      (empty for ``port_scan`` rows)
+    * ``description``   — one-line description / banner
+    * ``cve_ids``       — pipe-joined CVE identifiers (empty if none)
+
+    Requires pandas to be installed.
+
+    Args:
+        port_results:   List of :class:`PortScanResult` objects.
+        vuln_findings:  List of :class:`VulnerabilityFinding` objects.
+        fingerprints:   List of :class:`ServiceFingerprintResult` objects.
+
+    Returns:
+        :class:`pandas.DataFrame` combining all inputs.
+
+    Raises:
+        ImportError: If pandas is not installed.
+
+    Example
+    -------
+    ::
+
+        df = aggregate_scan_results(port_results=scanner.scan_range(...))
+        open_ports_df = df[df["is_open"]]
+        print(df.groupby("severity").size())
+    """
+    try:
+        import pandas as pd  # noqa: PLC0415
+    except ImportError as exc:  # pragma: no cover
+        raise ImportError("pandas is required for aggregate_scan_results().") from exc
+
+    rows: list[dict] = []
+
+    if port_results:
+        for r in port_results:
+            rows.append({
+                "result_type": "port_scan",
+                "host":        r.host,
+                "port":        r.port,
+                "is_open":     r.is_open,
+                "service":     r.service_hint or "",
+                "severity":    "",
+                "description": r.banner or "",
+                "cve_ids":     "",
+            })
+
+    if vuln_findings:
+        for f in vuln_findings:
+            rows.append({
+                "result_type": "vuln_finding",
+                "host":        "",
+                "port":        0,
+                "is_open":     True,
+                "service":     f.service,
+                "severity":    f.severity,
+                "description": f.description,
+                "cve_ids":     f.cve_id,
+            })
+
+    if fingerprints:
+        for fp in fingerprints:
+            rows.append({
+                "result_type": "fingerprint",
+                "host":        fp.host,
+                "port":        fp.port,
+                "is_open":     True,
+                "service":     fp.service_name or "",
+                "severity":    "",
+                "description": fp.raw_banner or "",
+                "cve_ids":     "",
+            })
+
+    if not rows:
+        return pd.DataFrame(
+            columns=["result_type", "host", "port", "is_open",
+                     "service", "severity", "description", "cve_ids"]
+        )
+    return pd.DataFrame(rows)
+
+
+# ===========================================================================
+# pwntools-backed binary fuzzer
+# ===========================================================================
+
+class BinaryFuzzer:
+    """
+    Generates binary fuzzing payloads using `pwntools
+    <https://github.com/Gallopsled/pwntools>`_.
+
+    Useful for controlled red-team exercises to test how target services
+    handle malformed or oversized inputs.  Three payload strategies are
+    available:
+
+    * **cyclic** — De Bruijn cyclic sequences for crash-offset identification.
+    * **de_bruijn** — Same as cyclic but generated via the raw
+      ``de_bruijn()`` generator; useful when a non-standard alphabet is
+      needed.
+    * **repeat** — Simple repeated-byte patterns (``"A" * n``,
+      ``"\\x00" * n``, etc.) for basic overflow testing.
+
+    All methods are pure (no network activity) and safe to call in CI.
+
+    Parameters
+    ----------
+    arch:
+        Target architecture string (``"amd64"`` / ``"i386"`` / ``"arm"`` /
+        ``"aarch64"``).  Used to set pwntools context.  Default ``"amd64"``.
+    endian:
+        ``"little"`` or ``"big"``.  Default ``"little"``.
+
+    Example
+    -------
+    ::
+
+        fuzzer = BinaryFuzzer(arch="amd64")
+        payload = fuzzer.cyclic_payload(256)
+        offset  = fuzzer.find_offset(b"baaa")  # → int or None
+        repeat  = fuzzer.repeat_payload(b"A", 512)
+    """
+
+    def __init__(
+        self,
+        arch: str = "amd64",
+        endian: str = "little",
+    ) -> None:
+        self.arch   = arch
+        self.endian = endian
+        try:
+            from pwn import context  # type: ignore[import]  # noqa: PLC0415
+            context.arch    = arch
+            context.endian  = endian
+            context.log_level = "error"   # suppress pwntools banner/info
+        except ImportError as exc:  # pragma: no cover
+            raise ImportError("pwntools is required for BinaryFuzzer.") from exc
+
+    def cyclic_payload(self, length: int) -> bytes:
+        """
+        Generate a De Bruijn cyclic byte sequence of *length* bytes.
+
+        Any 4-byte sub-sequence within the payload is unique, allowing crash
+        analysis tools to determine the exact byte offset of a saved return
+        address or instruction pointer overwrite.
+
+        Args:
+            length: Number of bytes to generate (must be ≥ 1).
+
+        Returns:
+            Byte string of exactly *length* bytes.
+        """
+        from pwn import cyclic  # type: ignore[import]  # noqa: PLC0415
+        return bytes(cyclic(length))
+
+    def find_offset(self, value: bytes) -> Optional[int]:
+        """
+        Find the byte offset of *value* within a previously generated cyclic
+        payload using :func:`pwnlib.util.cyclic.cyclic_find`.
+
+        Args:
+            value: A 4-byte sub-sequence found at the crash address (e.g.
+                   from a core dump or SIGSEGV handler).
+
+        Returns:
+            Integer byte offset (0-based), or ``None`` if not found.
+
+        Example
+        -------
+        ::
+
+            payload = fuzzer.cyclic_payload(512)
+            # Crash captures EIP/RIP = 0x61616167 ("gaaa" little-endian)
+            offset = fuzzer.find_offset(b"gaaa")
+            print(f"Overwrite starts at offset {offset}")   # → 24
+        """
+        try:
+            from pwn import cyclic_find  # type: ignore[import]  # noqa: PLC0415
+            result = int(cyclic_find(value))
+            return result if result >= 0 else None
+        except Exception:  # noqa: BLE001
+            return None
+
+    def repeat_payload(self, byte_pattern: bytes, length: int) -> bytes:
+        """
+        Generate a repeated-pattern payload of *length* bytes.
+
+        Useful for basic overflow tests where offset identification is not
+        required.
+
+        Args:
+            byte_pattern: Byte sequence to repeat.  Common choices: ``b"A"``,
+                          ``b"\\x00"``, ``b"\\x41\\x42"``.
+            length:       Total output length in bytes.
+
+        Returns:
+            Byte string of exactly *length* bytes.
+
+        Raises:
+            ValueError: If *byte_pattern* is empty.
+        """
+        if not byte_pattern:
+            raise ValueError("byte_pattern must not be empty.")
+        reps    = (length // len(byte_pattern)) + 1
+        return (byte_pattern * reps)[:length]
+
+    def format_string_probes(self, count: int = 8) -> list[bytes]:
+        """
+        Generate a list of classic format-string attack probes.
+
+        Probes include ``%s``, ``%x``, ``%n``, ``%p`` repetitions (ASCII)
+        as well as ``%08x.`` chains used to leak stack values.
+
+        Args:
+            count: Number of format specifier repetitions.  Default 8.
+
+        Returns:
+            List of byte strings, one per format specifier.
+        """
+        templates = ["%s", "%x", "%n", "%p", "%08x.", "%d", "%.10000d", "%hn"]
+        probes = []
+        for tmpl in templates:
+            probes.append((tmpl * count).encode())
+        return probes
+
+    def overflow_with_pattern(self, offset: int, payload: bytes = b"") -> bytes:
+        """
+        Build a standard overflow payload: ``cyclic(offset) + payload``.
+
+        Useful for constructing a ROP chain exploit once the offset to the
+        saved return address has been determined with :meth:`find_offset`.
+
+        Args:
+            offset:  Byte distance from the start of user input to the return
+                     address (obtained via :meth:`find_offset`).
+            payload: Shell payload / ROP chain appended after the padding.
+                     Defaults to empty bytes.
+
+        Returns:
+            ``cyclic(offset) + payload`` as a bytes object.
+        """
+        from pwn import cyclic  # type: ignore[import]  # noqa: PLC0415
+        return bytes(cyclic(offset)) + payload
