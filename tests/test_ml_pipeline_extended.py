@@ -1790,11 +1790,13 @@ class TestKFoldCrossValidation(unittest.TestCase):
             self.assertGreaterEqual(result[f"std_{metric}"], 0.0)
 
     def test_fold_metrics_average_to_mean(self) -> None:
-        """The mean over fold dicts should approximately match mean_accuracy."""
+        """The mean over fold dicts should match the reported mean_ for all metrics."""
         result = k_fold_cross_validate(self.data, k=4, epochs=20)
-        fold_accs = [f["accuracy"] for f in result["folds"]]
-        manual_mean = sum(fold_accs) / len(fold_accs)
-        self.assertAlmostEqual(result["mean_accuracy"], manual_mean, places=3)
+        for metric in ("accuracy", "precision", "recall", "f1", "roc_auc"):
+            fold_vals = [f[metric] for f in result["folds"]]
+            manual_mean = sum(fold_vals) / len(fold_vals)
+            self.assertAlmostEqual(result[f"mean_{metric}"], manual_mean, places=3,
+                                   msg=f"mean mismatch for {metric}")
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -993,6 +993,21 @@ class TestSecurityClassifier(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.clf.train([])
 
+    def test_partial_fit_updates_weights_and_marks_trained(self) -> None:
+        """partial_fit() must change weights and set _trained=True."""
+        self.clf.train(self.train)
+        before = list(self.clf.weights)
+        result = self.clf.partial_fit(self.train[:20], epochs=5)
+        self.assertIn("loss", result)
+        self.assertIsInstance(result["loss"], float)
+        self.assertNotEqual(self.clf.weights, before)
+        self.assertTrue(self.clf._trained)
+
+    def test_partial_fit_empty_raises(self) -> None:
+        """partial_fit() on an empty dataset must raise ValueError."""
+        with self.assertRaises(ValueError):
+            self.clf.partial_fit([])
+
     def test_save_and_load_round_trip(self) -> None:
         self.clf.train(self.train)
         with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as fh:

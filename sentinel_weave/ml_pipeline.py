@@ -524,8 +524,10 @@ class SecurityClassifier:
         prob      = self._sigmoid(raw_score)
 
         sorted_contribs = sorted(contributions.items(), key=lambda kv: kv[1])
-        top_benign = sorted_contribs[0][0]  if sorted_contribs[0][1]  < 0 else None
-        top_threat = sorted_contribs[-1][0] if sorted_contribs[-1][1] > 0 else None
+        top_benign = (sorted_contribs[0][0]  if sorted_contribs and sorted_contribs[0][1]  < 0
+                      else None)
+        top_threat = (sorted_contribs[-1][0] if sorted_contribs and sorted_contribs[-1][1] > 0
+                      else None)
 
         return {
             "contributions":    contributions,
@@ -838,9 +840,13 @@ def k_fold_cross_validate(
     result: dict = {"k": k}
     for key in metric_keys:
         values = all_metrics[key]
-        if values:
+        if len(values) > 1:
             mean_v = sum(values) / len(values)
-            std_v  = math.sqrt(sum((v - mean_v) ** 2 for v in values) / len(values))
+            # Sample standard deviation (Bessel's correction, N-1 denominator)
+            std_v  = math.sqrt(sum((v - mean_v) ** 2 for v in values) / (len(values) - 1))
+        elif len(values) == 1:
+            mean_v = values[0]
+            std_v  = 0.0
         else:
             mean_v = std_v = 0.0
         result[f"mean_{key}"] = round(mean_v, 4)
@@ -857,8 +863,11 @@ def _roc_auc(proba_label: list[tuple[float, int]]) -> float:
     """
     Compute ROC AUC via the trapezoidal rule over a full threshold sweep.
 
-    Operates in O(n log n) time.  Returns 0.5 gracefully when one class is
-    absent from the dataset (degenerate case — AUC is undefined).
+    Operates in O(n log n) time.  Returns 0.0 for an empty list.  Returns 0.5
+    when only one class is present in *proba_label* (degenerate edge case
+    where AUC is mathematically undefined — 0.5 signals "no better than random"
+    as a safe fallback; callers should ensure both classes are represented when
+    a precise AUC is required).
     """
     if not proba_label:
         return 0.0
