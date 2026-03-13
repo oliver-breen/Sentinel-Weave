@@ -27,6 +27,9 @@ What this demo covers
   Phase 12 – Explainability: per-feature contribution breakdown
   Phase 13 – Online / incremental learning with partial_fit()
   Phase 14 – K-Fold cross-validation (robust performance estimate)
+  Phase 16 – CIA Triad · Confidentiality: Role-Based Access Control (RBAC)
+  Phase 17 – CIA Triad · Integrity: HMAC event signing + tamper-evident audit chain
+  Phase 18 – CIA Triad · Availability: token-bucket rate limiting + heartbeat tracking
   Phase 15 – [optional --interact] Type your own log line and classify it live
 """
 
@@ -49,6 +52,9 @@ from sentinel_weave.ml_pipeline import (
     evaluate_classifier,
     k_fold_cross_validate,
 )
+from sentinel_weave.access_controller import AccessController, Role, Action
+from sentinel_weave.integrity_monitor import IntegrityMonitor
+from sentinel_weave.availability_monitor import TokenBucketRateLimiter, AvailabilityMonitor
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -547,6 +553,124 @@ def run_demo(epochs: int = 250, interact: bool = False) -> None:
     print()
     print("  " + _c("✔ Cross-validation complete — metrics reflect generalisation ability", "GREEN"))
 
+    # ── Phase 16: RBAC ────────────────────────────────────────────────────
+    _header("Phase 16 — CIA Triad · Confidentiality: Role-Based Access Control")
+    print("  Four roles (VIEWER → ANALYST → RESPONDER → ADMIN) gate every action.")
+    print()
+
+    ac = AccessController()
+    demo_checks = [
+        (Role.VIEWER,    Action.LIST,         "report-archive",   "bob"),
+        (Role.VIEWER,    Action.READ,         "report-2026.bin",  "bob"),
+        (Role.ANALYST,   Action.READ,         "report-2026.bin",  "alice"),
+        (Role.ANALYST,   Action.MANAGE_KEYS,  "*",                "alice"),
+        (Role.RESPONDER, Action.ACKNOWLEDGE,  "incident-007",     "carol"),
+        (Role.ADMIN,     Action.DELETE,       "report-old.bin",   "admin"),
+    ]
+    for role, action, resource, subject in demo_checks:
+        granted = ac.check(role, action, resource, subject)
+        colour  = "GREEN" if granted else "RED"
+        verdict = "GRANTED" if granted else "DENIED "
+        print(f"  {_c(verdict, colour)}  {subject:<8}  role={role.value:<10}  "
+              f"action={action.value:<14}  resource={resource!r}")
+
+    summary_rbac = ac.audit_summary()
+    print()
+    print(f"  Audit log: {summary_rbac['total']} decisions — "
+          f"{_c(str(summary_rbac['granted']) + ' granted', 'GREEN')}, "
+          f"{_c(str(summary_rbac['denied']) + ' denied', 'RED')}")
+    print("  " + _c("✔ RBAC engine enforcing the Confidentiality pillar", "GREEN"))
+    print()
+
+    # ── Phase 17: Integrity ────────────────────────────────────────────────
+    _header("Phase 17 — CIA Triad · Integrity: HMAC Event Signing + Audit Chain")
+    print("  Each parsed event is signed with HMAC-SHA256 at ingestion time.")
+    print("  An append-only chain makes retroactive log-wiping detectable.")
+    print()
+
+    integrity = IntegrityMonitor()
+
+    # Sign several events from the parsed corpus
+    signed_count = min(5, len(events))
+    signatures   = {}
+    for ev in events[:signed_count]:
+        sig = integrity.sign_event(ev)
+        signatures[id(ev)] = sig
+
+    print(f"  Signed {signed_count} events.  Verifying…")
+    all_ok = all(
+        integrity.verify_event(ev, signatures[id(ev)])
+        for ev in events[:signed_count]
+    )
+    print(f"  All valid (unmodified): {_c(str(all_ok), 'GREEN')}")
+
+    # Simulate tampering with one event
+    tampered_ev  = events[0]
+    original_ip  = tampered_ev.source_ip
+    tampered_ev.source_ip = "10.13.37.99"
+    tamper_check = integrity.verify_event(tampered_ev, signatures[id(tampered_ev)])
+    tampered_ev.source_ip = original_ip  # restore
+
+    print(f"  After source_ip tamper: {_c(str(tamper_check), 'RED' if not tamper_check else 'GREEN')}"
+          f"  ({'tamper detected ✔' if not tamper_check else 'unexpectedly valid'})")
+
+    # Build audit chain of analyst actions
+    integrity.append_to_chain({"action": "model_trained",   "epochs": epochs}, subject="pipeline")
+    integrity.append_to_chain({"action": "report_accessed", "subject": "alice"},  subject="alice")
+    integrity.append_to_chain({"action": "threat_acked",    "incident": "007"},   subject="carol")
+    chain_result = integrity.verify_chain()
+    print(f"  Audit chain ({chain_result.length} entries): "
+          f"{_c('VALID ✔' if chain_result.valid else 'BROKEN ✗', 'GREEN' if chain_result.valid else 'RED')}")
+    print()
+    print("  " + _c("✔ Integrity pillar: HMAC signatures + linked hash chain active", "GREEN"))
+    print()
+
+    # ── Phase 18: Availability ─────────────────────────────────────────────
+    _header("Phase 18 — CIA Triad · Availability: Rate Limiting + Heartbeat Tracking")
+    print("  A token-bucket limiter sheds load during event floods.")
+    print("  The availability monitor raises alerts when rates exceed thresholds.")
+    print()
+
+    import time as _time
+    limiter = TokenBucketRateLimiter(rate=5.0, burst=10.0)
+    avail   = AvailabilityMonitor(window_seconds=10.0, rate_threshold=3.0)
+
+    # Register services
+    avail.heartbeat("threat-detector")
+    avail.heartbeat("event-analyzer")
+
+    # Simulate an event flood
+    allowed_count = denied_count = 0
+    flood_alert = None
+    for _ in range(25):
+        rl_result = limiter.check("flood-ip")
+        if rl_result.allowed:
+            allowed_count += 1
+            a = avail.record_event("flood-ip", count=1)
+            if a and flood_alert is None:
+                flood_alert = a
+        else:
+            denied_count += 1
+
+    print(f"  Flood simulation (25 requests, burst=10, rate=5/s):")
+    print(f"    Allowed : {_c(str(allowed_count), 'GREEN')}")
+    print(f"    Denied  : {_c(str(denied_count),  'RED')}  (rate-limited)")
+    if flood_alert:
+        print(f"    Alert   : [{_c(flood_alert.severity.value, 'RED')}] "
+              f"{flood_alert.alert_type} — {flood_alert.message}")
+
+    # Heartbeat check — all services are healthy since we just registered them
+    svc_alerts = avail.check_services(max_age_seconds=30.0)
+    print(f"\n  Service heartbeat check:")
+    for svc in avail.registered_services():
+        healthy = not any(a.subject == svc for a in svc_alerts)
+        colour  = "GREEN" if healthy else "RED"
+        status  = "UP ✔" if healthy else "DOWN ✗"
+        print(f"    {_c(status, colour)}  {svc}")
+    print()
+    print("  " + _c("✔ Availability pillar: flood protection + liveness monitoring active", "GREEN"))
+    print()
+
     # ── Phase 15: interactive ──────────────────────────────────────────────
     if interact:
         _header("Phase 15 — Live Classifier: Type Your Own Log Line")
@@ -588,8 +712,17 @@ def run_demo(epochs: int = 250, interact: bool = False) -> None:
     print(f"  5-fold mean F1    : {cv_result['mean_f1']:.4f}  ±{cv_result['std_f1']:.4f}")
     print(f"  Model size        : 14 floats (13 weights + 1 bias)")
     print()
-    print("  " + _c("SentinelWeave ML pipeline — combining Python, Azure AI, and", "BOLD"))
-    print("  " + _c("cybersecurity into a deployable threat-detection system.", "BOLD"))
+    print("  CIA Triad coverage:")
+    print(f"    {_c('Confidentiality', 'CYAN')}  RBAC engine — "
+          f"{summary_rbac['total']} access decisions audited")
+    print(f"    {_c('Integrity      ', 'CYAN')}  HMAC event signing + "
+          f"{chain_result.length}-entry tamper-evident chain")
+    print(f"    {_c('Availability   ', 'CYAN')}  Token-bucket rate limiter + "
+          f"service heartbeat tracking")
+    print()
+    print("  " + _c("SentinelWeave — combining Python, Azure AI, post-quantum", "BOLD"))
+    print("  " + _c("cryptography, and CIA triad security into a deployable", "BOLD"))
+    print("  " + _c("threat-detection system.", "BOLD"))
     print()
 
 

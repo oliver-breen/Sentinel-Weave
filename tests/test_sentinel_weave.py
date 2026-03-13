@@ -1208,5 +1208,507 @@ class TestCLITrain(unittest.TestCase):
                 os.unlink(azure_path)
 
 
+# ===========================================================================
+# CIA Triad — Confidentiality: AccessController
+# ===========================================================================
+
+from sentinel_weave.access_controller import AccessController, Role, Action, AccessRequest
+
+
+class TestAccessControllerPermissions(unittest.TestCase):
+    """Role-permission matrix correctness."""
+
+    def setUp(self) -> None:
+        self.ac = AccessController()
+
+    def test_viewer_can_list(self) -> None:
+        self.assertTrue(self.ac.check(Role.VIEWER, Action.LIST))
+
+    def test_viewer_cannot_read(self) -> None:
+        self.assertFalse(self.ac.check(Role.VIEWER, Action.READ))
+
+    def test_viewer_cannot_delete(self) -> None:
+        self.assertFalse(self.ac.check(Role.VIEWER, Action.DELETE))
+
+    def test_analyst_can_list_read_export(self) -> None:
+        for action in (Action.LIST, Action.READ, Action.EXPORT):
+            self.assertTrue(self.ac.check(Role.ANALYST, action))
+
+    def test_analyst_cannot_acknowledge(self) -> None:
+        self.assertFalse(self.ac.check(Role.ANALYST, Action.ACKNOWLEDGE))
+
+    def test_analyst_cannot_manage_keys(self) -> None:
+        self.assertFalse(self.ac.check(Role.ANALYST, Action.MANAGE_KEYS))
+
+    def test_responder_can_acknowledge(self) -> None:
+        self.assertTrue(self.ac.check(Role.RESPONDER, Action.ACKNOWLEDGE))
+
+    def test_responder_cannot_configure(self) -> None:
+        self.assertFalse(self.ac.check(Role.RESPONDER, Action.CONFIGURE))
+
+    def test_admin_has_all_actions(self) -> None:
+        for action in Action:
+            self.assertTrue(self.ac.check(Role.ADMIN, action))
+
+    def test_permitted_actions_viewer(self) -> None:
+        actions = self.ac.permitted_actions(Role.VIEWER)
+        self.assertIn(Action.LIST, actions)
+        self.assertNotIn(Action.READ, actions)
+
+    def test_permitted_actions_admin(self) -> None:
+        actions = self.ac.permitted_actions(Role.ADMIN)
+        self.assertEqual(actions, frozenset(Action))
+
+
+class TestAccessControllerAssertPermitted(unittest.TestCase):
+    """assert_permitted raises PermissionError on denied actions."""
+
+    def setUp(self) -> None:
+        self.ac = AccessController()
+
+    def test_raises_permission_error_for_denied_action(self) -> None:
+        with self.assertRaises(PermissionError):
+            self.ac.assert_permitted(Role.VIEWER, Action.MANAGE_KEYS)
+
+    def test_does_not_raise_for_allowed_action(self) -> None:
+        # Should not raise
+        self.ac.assert_permitted(Role.ADMIN, Action.DELETE, "report-001.bin", "admin")
+
+    def test_error_message_contains_role_and_action(self) -> None:
+        with self.assertRaises(PermissionError) as ctx:
+            self.ac.assert_permitted(Role.ANALYST, Action.DELETE)
+        msg = str(ctx.exception)
+        self.assertIn("ANALYST", msg)
+        self.assertIn("DELETE", msg)
+
+
+class TestAccessControllerAuditLog(unittest.TestCase):
+    """Audit log records every decision."""
+
+    def setUp(self) -> None:
+        self.ac = AccessController()
+
+    def test_log_grows_on_each_check(self) -> None:
+        self.ac.check(Role.ANALYST, Action.READ, "r1", "alice")
+        self.ac.check(Role.VIEWER, Action.DELETE, "r2", "bob")
+        self.assertEqual(len(self.ac.get_audit_log()), 2)
+
+    def test_log_records_granted_true_for_allowed(self) -> None:
+        self.ac.check(Role.ANALYST, Action.READ, "r1", "alice")
+        entry = self.ac.get_audit_log()[0]
+        self.assertTrue(entry.granted)
+
+    def test_log_records_granted_false_for_denied(self) -> None:
+        self.ac.check(Role.VIEWER, Action.DELETE, "r2", "bob")
+        entry = self.ac.get_audit_log()[0]
+        self.assertFalse(entry.granted)
+
+    def test_clear_audit_log(self) -> None:
+        self.ac.check(Role.ANALYST, Action.READ)
+        self.ac.clear_audit_log()
+        self.assertEqual(len(self.ac.get_audit_log()), 0)
+
+    def test_audit_disabled_generates_no_log(self) -> None:
+        ac = AccessController(audit_enabled=False)
+        ac.check(Role.ADMIN, Action.DELETE)
+        self.assertEqual(len(ac.get_audit_log()), 0)
+
+    def test_audit_summary_counts_granted_denied(self) -> None:
+        self.ac.check(Role.ANALYST, Action.READ)       # granted
+        self.ac.check(Role.ANALYST, Action.READ)       # granted
+        self.ac.check(Role.VIEWER,  Action.DELETE)     # denied
+        summary = self.ac.audit_summary()
+        self.assertEqual(summary["granted"], 2)
+        self.assertEqual(summary["denied"], 1)
+        self.assertEqual(summary["total"], 3)
+
+    def test_audit_summary_most_denied_action(self) -> None:
+        self.ac.check(Role.VIEWER, Action.DELETE)
+        self.ac.check(Role.VIEWER, Action.DELETE)
+        self.ac.check(Role.VIEWER, Action.MANAGE_KEYS)
+        summary = self.ac.audit_summary()
+        self.assertEqual(summary["most_denied_action"], "DELETE")
+
+    def test_audit_summary_empty_log(self) -> None:
+        summary = self.ac.audit_summary()
+        self.assertEqual(summary["total"], 0)
+        self.assertIsNone(summary["most_denied_action"])
+
+    def test_get_audit_log_returns_copy(self) -> None:
+        self.ac.check(Role.ANALYST, Action.READ)
+        log1 = self.ac.get_audit_log()
+        log1.clear()
+        self.assertEqual(len(self.ac.get_audit_log()), 1)
+
+    def test_access_request_str_contains_verdict(self) -> None:
+        self.ac.check(Role.ANALYST, Action.READ, "report-x", "alice")
+        entry = self.ac.get_audit_log()[0]
+        text = str(entry)
+        self.assertIn("GRANTED", text)
+        self.assertIn("alice", text)
+
+
+# ===========================================================================
+# CIA Triad — Integrity: IntegrityMonitor
+# ===========================================================================
+
+from sentinel_weave.integrity_monitor import (
+    IntegrityMonitor, AuditEntry, ChainVerificationResult,
+)
+
+
+class TestIntegrityMonitorEventSigning(unittest.TestCase):
+    """HMAC event signing and verification."""
+
+    def setUp(self) -> None:
+        self.ea  = EventAnalyzer()
+        self.mon = IntegrityMonitor(secret_key=b"test-key-32-bytes-exactly!!!!!!!!")
+
+    def _event(self, text: str):
+        return self.ea.parse(text)
+
+    def test_sign_returns_64_char_hex(self) -> None:
+        sig = self.mon.sign_event(self._event("Failed password for root"))
+        self.assertEqual(len(sig), 64)
+        int(sig, 16)  # must be valid hex
+
+    def test_verify_valid_signature(self) -> None:
+        ev  = self._event("Failed password for root from 10.0.0.1")
+        sig = self.mon.sign_event(ev)
+        self.assertTrue(self.mon.verify_event(ev, sig))
+
+    def test_verify_detects_raw_tamper(self) -> None:
+        ev  = self._event("Accepted publickey for alice")
+        sig = self.mon.sign_event(ev)
+        ev.raw = "Malicious replacement"
+        self.assertFalse(self.mon.verify_event(ev, sig))
+
+    def test_verify_detects_source_ip_tamper(self) -> None:
+        ev  = self._event("Failed password for root from 10.0.0.1")
+        sig = self.mon.sign_event(ev)
+        ev.source_ip = "9.9.9.9"
+        self.assertFalse(self.mon.verify_event(ev, sig))
+
+    def test_verify_detects_severity_tamper(self) -> None:
+        ev  = self._event("Failed password for root from 10.0.0.1")
+        sig = self.mon.sign_event(ev)
+        ev.severity = 0.0
+        self.assertFalse(self.mon.verify_event(ev, sig))
+
+    def test_verify_wrong_signature_string(self) -> None:
+        ev = self._event("info: cron job started")
+        self.assertFalse(self.mon.verify_event(ev, "a" * 64))
+
+    def test_two_identical_events_have_same_signature(self) -> None:
+        ev1 = self._event("Port scan detected from 192.168.1.1")
+        ev2 = self._event("Port scan detected from 192.168.1.1")
+        self.assertEqual(self.mon.sign_event(ev1), self.mon.sign_event(ev2))
+
+    def test_different_secret_key_produces_different_signature(self) -> None:
+        ev   = self._event("Failed password for root")
+        mon2 = IntegrityMonitor(secret_key=b"different-key-32-bytes-exactly!!!")
+        self.assertNotEqual(self.mon.sign_event(ev), mon2.sign_event(ev))
+
+
+class TestIntegrityMonitorAuditChain(unittest.TestCase):
+    """Audit chain construction and verification."""
+
+    _CLOCK_VAL = ["2026-01-01T00:00:00+00:00"]
+
+    def _clock(self) -> str:
+        return self._CLOCK_VAL[0]
+
+    def setUp(self) -> None:
+        self.mon = IntegrityMonitor(
+            secret_key=b"chain-key-32-bytes-exactly!!!!!!",
+            clock=self._clock,
+        )
+
+    def test_empty_chain_verifies_valid(self) -> None:
+        result = self.mon.verify_chain()
+        self.assertTrue(result.valid)
+        self.assertEqual(result.length, 0)
+
+    def test_append_increases_chain_length(self) -> None:
+        self.mon.append_to_chain({"action": "opened"}, subject="alice")
+        self.assertEqual(self.mon.chain_length, 1)
+
+    def test_first_entry_index_is_zero(self) -> None:
+        entry = self.mon.append_to_chain({"x": 1})
+        self.assertEqual(entry.index, 0)
+
+    def test_second_entry_prev_hash_matches_first_entry_hash(self) -> None:
+        e1 = self.mon.append_to_chain({"step": 1})
+        e2 = self.mon.append_to_chain({"step": 2})
+        self.assertEqual(e2.prev_hash, e1.entry_hash)
+
+    def test_valid_chain_verifies(self) -> None:
+        for i in range(5):
+            self.mon.append_to_chain({"i": i}, subject="sys")
+        result = self.mon.verify_chain()
+        self.assertTrue(result.valid)
+        self.assertEqual(result.length, 5)
+
+    def test_tampered_data_breaks_chain(self) -> None:
+        self.mon.append_to_chain({"action": "login"})
+        self.mon.append_to_chain({"action": "read_report"})
+        # Silently mutate first entry's data
+        self.mon._chain[0].data["action"] = "wiped_logs"
+        result = self.mon.verify_chain()
+        self.assertFalse(result.valid)
+        self.assertEqual(result.broken_at, 0)
+
+    def test_tampered_prev_hash_breaks_chain(self) -> None:
+        self.mon.append_to_chain({"step": 1})
+        self.mon.append_to_chain({"step": 2})
+        self.mon._chain[1].prev_hash = "a" * 64
+        result = self.mon.verify_chain()
+        self.assertFalse(result.valid)
+        self.assertIsNotNone(result.broken_at)
+
+    def test_export_chain_is_json_serialisable(self) -> None:
+        self.mon.append_to_chain({"msg": "hello"}, subject="bot")
+        exported = self.mon.export_chain()
+        import json
+        text = json.dumps(exported)  # must not raise
+        self.assertIsInstance(text, str)
+
+    def test_export_chain_has_correct_length(self) -> None:
+        for i in range(3):
+            self.mon.append_to_chain({"i": i})
+        self.assertEqual(len(self.mon.export_chain()), 3)
+
+    def test_get_chain_returns_copy(self) -> None:
+        self.mon.append_to_chain({"x": 1})
+        chain_copy = self.mon.get_chain()
+        chain_copy.clear()
+        self.assertEqual(self.mon.chain_length, 1)
+
+    def test_verification_reason_contains_count(self) -> None:
+        self.mon.append_to_chain({"a": 1})
+        self.mon.append_to_chain({"b": 2})
+        result = self.mon.verify_chain()
+        self.assertIn("2", result.reason)
+
+
+# ===========================================================================
+# CIA Triad — Availability: TokenBucketRateLimiter & AvailabilityMonitor
+# ===========================================================================
+
+from sentinel_weave.availability_monitor import (
+    TokenBucketRateLimiter, AvailabilityMonitor,
+    AvailabilityAlert, AlertSeverity, RateLimitResult,
+)
+
+
+class TestTokenBucketRateLimiter(unittest.TestCase):
+    """Token-bucket rate limiter behaviour."""
+
+    def _make_clock(self, initial: float = 0.0):
+        """Return a mutable clock list and a clock callable."""
+        t = [initial]
+        return t, lambda: t[0]
+
+    def test_burst_allows_initial_requests(self) -> None:
+        _, clock = self._make_clock(0.0)
+        limiter = TokenBucketRateLimiter(rate=1.0, burst=3.0, clock=clock)
+        results = [limiter.check("ip") for _ in range(3)]
+        self.assertTrue(all(r.allowed for r in results))
+
+    def test_exceeding_burst_is_denied(self) -> None:
+        _, clock = self._make_clock(0.0)
+        limiter = TokenBucketRateLimiter(rate=1.0, burst=3.0, clock=clock)
+        for _ in range(3):
+            limiter.check("ip")
+        result = limiter.check("ip")
+        self.assertFalse(result.allowed)
+
+    def test_retry_after_seconds_positive_when_denied(self) -> None:
+        _, clock = self._make_clock(0.0)
+        limiter = TokenBucketRateLimiter(rate=1.0, burst=1.0, clock=clock)
+        limiter.check("ip")  # consume the single token
+        result = limiter.check("ip")
+        self.assertFalse(result.allowed)
+        self.assertGreater(result.retry_after_seconds, 0.0)
+
+    def test_tokens_replenish_over_time(self) -> None:
+        t, clock = self._make_clock(0.0)
+        limiter = TokenBucketRateLimiter(rate=2.0, burst=2.0, clock=clock)
+        limiter.check("ip")
+        limiter.check("ip")  # bucket empty
+        t[0] = 1.0           # advance 1 second → 2 new tokens
+        result = limiter.check("ip")
+        self.assertTrue(result.allowed)
+
+    def test_reset_restores_full_bucket(self) -> None:
+        _, clock = self._make_clock(0.0)
+        limiter = TokenBucketRateLimiter(rate=1.0, burst=2.0, clock=clock)
+        limiter.check("ip")
+        limiter.check("ip")  # exhaust
+        limiter.reset("ip")
+        result = limiter.check("ip")
+        self.assertTrue(result.allowed)
+
+    def test_different_subjects_are_independent(self) -> None:
+        _, clock = self._make_clock(0.0)
+        limiter = TokenBucketRateLimiter(rate=1.0, burst=1.0, clock=clock)
+        limiter.check("ip-a")  # exhaust ip-a
+        result_b = limiter.check("ip-b")
+        self.assertTrue(result_b.allowed)
+
+    def test_invalid_rate_raises_value_error(self) -> None:
+        with self.assertRaises(ValueError):
+            TokenBucketRateLimiter(rate=0.0, burst=10.0)
+
+    def test_invalid_burst_raises_value_error(self) -> None:
+        with self.assertRaises(ValueError):
+            TokenBucketRateLimiter(rate=1.0, burst=-5.0)
+
+    def test_bucket_state_returns_empty_for_unknown_subject(self) -> None:
+        _, clock = self._make_clock(0.0)
+        limiter = TokenBucketRateLimiter(rate=1.0, burst=5.0, clock=clock)
+        self.assertEqual(limiter.bucket_state("never-seen"), {})
+
+    def test_bucket_state_after_check(self) -> None:
+        _, clock = self._make_clock(0.0)
+        limiter = TokenBucketRateLimiter(rate=1.0, burst=5.0, clock=clock)
+        limiter.check("ip")
+        state = limiter.bucket_state("ip")
+        self.assertIn("tokens", state)
+        self.assertLess(state["tokens"], 5.0)
+
+
+class TestAvailabilityMonitorRates(unittest.TestCase):
+    """Sliding-window event-rate monitoring."""
+
+    def _make_clock(self, initial: float = 0.0):
+        t = [initial]
+        return t, lambda: t[0]
+
+    def test_rate_below_threshold_returns_no_alert(self) -> None:
+        _, clock = self._make_clock(0.0)
+        monitor = AvailabilityMonitor(window_seconds=10.0, rate_threshold=100.0, clock=clock)
+        alert = monitor.record_event("ip", count=5)
+        self.assertIsNone(alert)
+
+    def test_rate_above_threshold_returns_alert(self) -> None:
+        _, clock = self._make_clock(0.0)
+        monitor = AvailabilityMonitor(window_seconds=10.0, rate_threshold=5.0, clock=clock)
+        alert = monitor.record_event("ip", count=100)
+        self.assertIsNotNone(alert)
+        self.assertEqual(alert.alert_type, "RATE_EXCEEDED")
+
+    def test_alert_contains_correct_subject(self) -> None:
+        _, clock = self._make_clock(0.0)
+        monitor = AvailabilityMonitor(window_seconds=10.0, rate_threshold=1.0, clock=clock)
+        alert = monitor.record_event("attacker-ip", count=50)
+        self.assertEqual(alert.subject, "attacker-ip")
+
+    def test_get_current_rate_zero_before_any_events(self) -> None:
+        _, clock = self._make_clock(0.0)
+        monitor = AvailabilityMonitor(window_seconds=60.0, rate_threshold=100.0, clock=clock)
+        self.assertEqual(monitor.get_current_rate("ip"), 0.0)
+
+    def test_get_current_rate_reflects_recorded_events(self) -> None:
+        _, clock = self._make_clock(0.0)
+        monitor = AvailabilityMonitor(window_seconds=10.0, rate_threshold=1000.0, clock=clock)
+        monitor.record_event("ip", count=50)
+        rate = monitor.get_current_rate("ip")
+        self.assertAlmostEqual(rate, 5.0)  # 50 events / 10s window
+
+    def test_old_events_evicted_from_window(self) -> None:
+        t, clock = self._make_clock(0.0)
+        monitor = AvailabilityMonitor(window_seconds=10.0, rate_threshold=1000.0, clock=clock)
+        monitor.record_event("ip", count=100)   # at t=0
+        t[0] = 20.0                              # advance past window
+        rate = monitor.get_current_rate("ip")
+        self.assertEqual(rate, 0.0)
+
+    def test_flush_alerts_clears_list(self) -> None:
+        _, clock = self._make_clock(0.0)
+        monitor = AvailabilityMonitor(window_seconds=10.0, rate_threshold=1.0, clock=clock)
+        monitor.record_event("ip", count=100)
+        alerts = monitor.flush_alerts()
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(len(monitor.get_alerts()), 0)
+
+    def test_invalid_window_raises(self) -> None:
+        with self.assertRaises(ValueError):
+            AvailabilityMonitor(window_seconds=-1.0)
+
+    def test_invalid_threshold_raises(self) -> None:
+        with self.assertRaises(ValueError):
+            AvailabilityMonitor(rate_threshold=0.0)
+
+
+class TestAvailabilityMonitorHeartbeats(unittest.TestCase):
+    """Service heartbeat tracking."""
+
+    def _make_clock(self, initial: float = 0.0):
+        t = [initial]
+        return t, lambda: t[0]
+
+    def test_fresh_heartbeat_not_flagged(self) -> None:
+        t, clock = self._make_clock(0.0)
+        monitor = AvailabilityMonitor(clock=clock)
+        monitor.heartbeat("detector")
+        t[0] = 10.0  # 10s later
+        alerts = monitor.check_services(max_age_seconds=30.0)
+        self.assertEqual(len(alerts), 0)
+
+    def test_stale_heartbeat_raises_alert(self) -> None:
+        t, clock = self._make_clock(0.0)
+        monitor = AvailabilityMonitor(clock=clock)
+        monitor.heartbeat("detector")
+        t[0] = 120.0  # 2 minutes later — way past max_age
+        alerts = monitor.check_services(max_age_seconds=30.0)
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(alerts[0].alert_type, "SERVICE_DOWN")
+        self.assertEqual(alerts[0].subject, "detector")
+
+    def test_multiple_services_independent(self) -> None:
+        t, clock = self._make_clock(0.0)
+        monitor = AvailabilityMonitor(clock=clock)
+        monitor.heartbeat("svc-a")
+        monitor.heartbeat("svc-b")
+        t[0] = 100.0
+        monitor.heartbeat("svc-b")  # renew svc-b
+        t[0] = 110.0
+        alerts = monitor.check_services(max_age_seconds=30.0)
+        subjects = [a.subject for a in alerts]
+        self.assertIn("svc-a", subjects)
+        self.assertNotIn("svc-b", subjects)
+
+    def test_registered_services_returns_sorted_list(self) -> None:
+        _, clock = self._make_clock(0.0)
+        monitor = AvailabilityMonitor(clock=clock)
+        monitor.heartbeat("zebra-svc")
+        monitor.heartbeat("alpha-svc")
+        svcs = monitor.registered_services()
+        self.assertEqual(svcs, sorted(svcs))
+
+    def test_invalid_max_age_raises(self) -> None:
+        _, clock = self._make_clock(0.0)
+        monitor = AvailabilityMonitor(clock=clock)
+        with self.assertRaises(ValueError):
+            monitor.check_services(max_age_seconds=0.0)
+
+    def test_critical_severity_for_very_stale_service(self) -> None:
+        t, clock = self._make_clock(0.0)
+        monitor = AvailabilityMonitor(clock=clock)
+        monitor.heartbeat("detector")
+        t[0] = 1000.0  # far beyond 3× max_age
+        alerts = monitor.check_services(max_age_seconds=30.0)
+        self.assertEqual(alerts[0].severity, AlertSeverity.CRITICAL)
+
+    def test_availability_alert_summary_is_string(self) -> None:
+        t, clock = self._make_clock(0.0)
+        monitor = AvailabilityMonitor(clock=clock)
+        monitor.heartbeat("svc")
+        t[0] = 200.0
+        alerts = monitor.check_services(max_age_seconds=10.0)
+        self.assertIsInstance(alerts[0].summary(), str)
+
+
 if __name__ == "__main__":
     unittest.main()
