@@ -16,6 +16,12 @@ Combines:
     - Confidentiality: Role-Based Access Control (RBAC)
     - Integrity:       HMAC event signing + tamper-evident audit chain
     - Availability:    Token-bucket rate limiting + heartbeat monitoring
+* Red-team / offensive security toolkit (authorized use only):
+    - TCP port scanning
+    - Service fingerprinting (banner grabbing)
+    - Vulnerability assessment against known CVE patterns
+    - Password / credential strength auditing
+    - Passive DNS reconnaissance
 """
 
 __version__ = "0.3.0"
@@ -40,6 +46,15 @@ from .email_scanner import (
 )
 from .siem_exporter import (
     SiemExporter, CefRecord, LeefRecord,
+)
+from .red_team_toolkit import (
+    PortScanner, PortScanResult,
+    ServiceFingerprinter, ServiceFingerprintResult,
+    VulnerabilityAssessor, VulnerabilityFinding,
+    CredentialAuditor, PasswordAuditResult,
+    ReconScanner, ReconResult,
+    summarize_scan,
+    COMMON_PORTS, WEB_PORTS, DB_PORTS, ADMIN_PORTS,
 )
 
 __all__ = [
@@ -89,4 +104,20 @@ __all__ = [
     "SiemExporter",
     "CefRecord",
     "LeefRecord",
+    # Red-team / offensive security toolkit (authorized use only)
+    "PortScanner",
+    "PortScanResult",
+    "ServiceFingerprinter",
+    "ServiceFingerprintResult",
+    "VulnerabilityAssessor",
+    "VulnerabilityFinding",
+    "CredentialAuditor",
+    "PasswordAuditResult",
+    "ReconScanner",
+    "ReconResult",
+    "summarize_scan",
+    "COMMON_PORTS",
+    "WEB_PORTS",
+    "DB_PORTS",
+    "ADMIN_PORTS",
 ]

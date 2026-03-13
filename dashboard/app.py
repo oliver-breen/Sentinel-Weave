@@ -56,6 +56,13 @@ from sentinel_weave import (
     summarize_reports,
 )
 from sentinel_weave.email_scanner import EmailScanner, EmailScanResult
+from sentinel_weave.red_team_toolkit import (
+    PortScanner,
+    VulnerabilityAssessor,
+    CredentialAuditor,
+    ReconScanner,
+    summarize_scan,
+)
 
 # ---------------------------------------------------------------------------
 # In-memory metrics store
@@ -301,6 +308,10 @@ def create_app(demo_mode: bool = True) -> Flask:
     analyzer   = EventAnalyzer()
     detector   = ThreatDetector()
     email_scan = EmailScanner()
+    port_scanner    = PortScanner(timeout=1.0)
+    vuln_assessor   = VulnerabilityAssessor()
+    cred_auditor    = CredentialAuditor()
+    recon_scanner   = ReconScanner(timeout=3.0)
 
     if demo_mode:
         _start_demo_simulator(store)
@@ -393,5 +404,134 @@ def create_app(demo_mode: bool = True) -> Flask:
     @app.get("/health")
     def health() -> Response:
         return jsonify({"status": "ok", "version": "1.0"})
+
+    # ------------------------------------------------------------------ #
+    # Red-team / offensive security endpoints (authorized use only)        #
+    # ------------------------------------------------------------------ #
+
+    @app.post("/api/redteam/portscan")
+    def api_redteam_portscan() -> Response:
+        """
+        TCP-connect port scan a single host.
+
+        Request JSON fields:
+          ``host``        (str, required)  — target hostname or IP address.
+          ``ports``       (list[int])      — explicit port list (optional).
+          ``port_range``  ([start, end])   — inclusive port range (optional).
+
+        If neither ``ports`` nor ``port_range`` is supplied the 30 most
+        common service ports are scanned.
+
+        Returns a scan summary plus per-port open/closed status.
+        """
+        payload = request.get_json(force=True, silent=True) or {}
+        host = payload.get("host", "")
+        if not host:
+            return jsonify({"error": "field 'host' is required"}), 400
+
+        ports      = payload.get("ports")
+        port_range = payload.get("port_range")
+
+        # Restrict scanned ports to a sane limit to prevent abuse
+        _MAX_PORTS = 200
+        if ports and len(ports) > _MAX_PORTS:
+            return jsonify(
+                {"error": f"port list too large (max {_MAX_PORTS})"}
+            ), 400
+        if port_range and (
+            not isinstance(port_range, list)
+            or len(port_range) != 2
+            or (port_range[1] - port_range[0]) > _MAX_PORTS
+        ):
+            return jsonify(
+                {"error": f"port_range span exceeds max of {_MAX_PORTS}"}
+            ), 400
+
+        results = port_scanner.scan(
+            host,
+            ports=ports,
+            port_range=tuple(port_range) if port_range else None,
+        )
+        summary = summarize_scan(results)
+        detail = [
+            {
+                "port":         r.port,
+                "is_open":      r.is_open,
+                "service_hint": r.service_hint,
+                "banner":       r.banner[:80] if r.banner else "",
+            }
+            for r in results
+        ]
+        return jsonify({"summary": summary, "ports": detail}), 200
+
+    @app.post("/api/redteam/vulnscan")
+    def api_redteam_vulnscan() -> Response:
+        """
+        Check a service banner string against known CVE patterns.
+
+        Request JSON fields:
+          ``banner``  (str, required) — raw service banner to assess.
+
+        Returns a list of :class:`VulnerabilityFinding` dicts and the
+        overall highest severity.
+        """
+        payload = request.get_json(force=True, silent=True) or {}
+        banner = payload.get("banner", "")
+        if not banner:
+            return jsonify({"error": "field 'banner' is required"}), 400
+
+        findings = vuln_assessor.assess(str(banner))
+        return jsonify({
+            "banner":           banner[:120],
+            "finding_count":    len(findings),
+            "highest_severity": VulnerabilityAssessor.highest_severity(findings),
+            "findings": [
+                {
+                    "cve_id":      f.cve_id,
+                    "severity":    f.severity,
+                    "cvss_score":  f.cvss_score,
+                    "service":     f.service,
+                    "description": f.description,
+                    "match_token": f.match_token,
+                }
+                for f in findings
+            ],
+        }), 200
+
+    @app.post("/api/redteam/credaudit")
+    def api_redteam_credaudit() -> Response:
+        """
+        Audit one or more password strings for strength.
+
+        Request JSON fields:
+          ``passwords``  (list[str], required) — passwords to audit (max 50).
+
+        Passwords are **never logged or stored**; only their SHA-256 hashes
+        appear in the response.
+        """
+        payload = request.get_json(force=True, silent=True) or {}
+        passwords = payload.get("passwords", [])
+        if not passwords or not isinstance(passwords, list):
+            return jsonify({"error": "field 'passwords' must be a non-empty list"}), 400
+        if len(passwords) > 50:
+            return jsonify({"error": "max 50 passwords per request"}), 400
+
+        results = cred_auditor.audit_bulk([str(p) for p in passwords])
+        return jsonify({
+            "count": len(results),
+            "results": [
+                {
+                    "index":         i,
+                    "password_hash": r.password_hash,
+                    "length":        r.length,
+                    "entropy_bits":  r.entropy_bits,
+                    "strength":      r.strength,
+                    "is_common":     r.is_common,
+                    "issues":        r.issues,
+                    "suggestions":   r.suggestions,
+                }
+                for i, r in enumerate(results)
+            ],
+        }), 200
 
     return app
