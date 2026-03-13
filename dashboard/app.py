@@ -63,6 +63,11 @@ from sentinel_weave.red_team_toolkit import (
     ReconScanner,
     summarize_scan,
 )
+from sentinel_weave.advanced_offensive import (
+    ShellcodeAnalyzer,
+    YaraScanner,
+    AnomalyDetector,
+)
 
 # ---------------------------------------------------------------------------
 # In-memory metrics store
@@ -312,6 +317,9 @@ def create_app(demo_mode: bool = True) -> Flask:
     vuln_assessor   = VulnerabilityAssessor()
     cred_auditor    = CredentialAuditor()
     recon_scanner   = ReconScanner(timeout=3.0)
+    shellcode_analyzer = ShellcodeAnalyzer(arch="x86_64")
+    yara_scanner       = YaraScanner()
+    anomaly_detector   = AnomalyDetector()
 
     if demo_mode:
         _start_demo_simulator(store)
@@ -531,6 +539,187 @@ def create_app(demo_mode: bool = True) -> Flask:
                     "suggestions":   r.suggestions,
                 }
                 for i, r in enumerate(results)
+            ],
+        }), 200
+
+    @app.post("/api/redteam/shellcode")
+    def api_redteam_shellcode() -> Response:
+        """
+        Disassemble and classify shellcode bytes.
+
+        Request JSON fields:
+          ``hex``   (str, required)  — hex-encoded shellcode bytes
+                                       (e.g. ``"4831c04889c7b03b0f05"``).
+          ``arch``  (str, optional)  — one of ``"x86"``, ``"x86_64"``,
+                                       ``"arm"``, ``"arm64"``
+                                       (default: ``"x86_64"``).
+
+        Returns disassembly, mnemonic summary, pattern matches, entropy,
+        and a ``threat_level`` of ``"BENIGN"``, ``"SUSPICIOUS"``, or
+        ``"MALICIOUS"``.
+        """
+        payload = request.get_json(force=True, silent=True) or {}
+        hex_str = payload.get("hex", "")
+        if not hex_str:
+            return jsonify({"error": "field 'hex' is required"}), 400
+        # Strip whitespace
+        hex_str = hex_str.replace(" ", "").replace("\n", "")
+        try:
+            data = bytes.fromhex(hex_str)
+        except ValueError:
+            return jsonify({"error": "field 'hex' is not valid hex"}), 400
+        if len(data) > 4096:
+            return jsonify({"error": "shellcode too large (max 4 096 bytes)"}), 400
+
+        arch = payload.get("arch", "x86_64")
+        try:
+            analyzer = ShellcodeAnalyzer(arch=arch)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+        result = analyzer.analyze(data)
+        return jsonify({
+            "arch":               result.arch,
+            "byte_count":         result.byte_count,
+            "instruction_count":  result.instruction_count,
+            "entropy":            result.entropy,
+            "threat_level":       result.threat_level,
+            "dangerous_mnemonics": result.dangerous_mnemonics,
+            "matched_patterns":   result.matched_patterns,
+            "mnemonic_summary":   result.mnemonic_summary,
+            "notes":              result.notes,
+            "instructions": [
+                {
+                    "address":   hex(i.address),
+                    "mnemonic":  i.mnemonic,
+                    "op_str":    i.op_str,
+                    "bytes_hex": i.bytes_hex,
+                }
+                for i in result.instructions[:64]   # cap display to 64 insns
+            ],
+        }), 200
+
+    @app.post("/api/redteam/yara")
+    def api_redteam_yara() -> Response:
+        """
+        Scan a content buffer against YARA rule sets.
+
+        Request JSON fields:
+          ``hex``        (str)         — hex-encoded content to scan.
+          ``text``       (str)         — UTF-8 text content to scan
+                                         (exactly one of ``hex`` or ``text``
+                                         is required).
+          ``rule_sets``  (list[str])   — subset of :data:`BUILTIN_RULE_NAMES`
+                                         to use (default: all built-in sets).
+          ``custom_rules`` (str)       — optional extra YARA source appended
+                                         to the selected rule sets.
+
+        Returns match count, severity, matched rule details.
+        """
+        payload = request.get_json(force=True, silent=True) or {}
+        hex_str  = payload.get("hex", "")
+        text_str = payload.get("text", "")
+
+        if not hex_str and not text_str:
+            return jsonify(
+                {"error": "one of 'hex' or 'text' is required"}
+            ), 400
+        if hex_str and text_str:
+            return jsonify(
+                {"error": "supply either 'hex' or 'text', not both"}
+            ), 400
+
+        if hex_str:
+            try:
+                data = bytes.fromhex(hex_str.replace(" ", ""))
+            except ValueError:
+                return jsonify({"error": "field 'hex' is not valid hex"}), 400
+        else:
+            data = text_str.encode("utf-8", errors="replace")
+
+        if len(data) > 10 * 1024 * 1024:
+            return jsonify({"error": "content too large (max 10 MiB)"}), 400
+
+        rule_sets    = payload.get("rule_sets")      # None → all built-ins
+        custom_rules = payload.get("custom_rules", "")
+
+        try:
+            scanner = YaraScanner(rule_sets=rule_sets, extra_rules=custom_rules)
+        except (ValueError, Exception) as exc:
+            return jsonify({"error": str(exc)}), 400
+
+        result = scanner.scan(data)
+        return jsonify({
+            "match_count":    result.match_count,
+            "severity":       result.severity,
+            "rule_sets_used": result.rule_sets_used,
+            "matches": [
+                {
+                    "rule_name":   m.rule_name,
+                    "rule_set":    m.rule_set,
+                    "description": m.description,
+                    "severity":    m.severity,
+                    "offset":      m.offset,
+                    "data_hex":    m.data_hex,
+                }
+                for m in result.matches
+            ],
+        }), 200
+
+    @app.post("/api/redteam/anomaly")
+    def api_redteam_anomaly() -> Response:
+        """
+        Run unsupervised anomaly detection on a set of security observations.
+
+        Request JSON fields:
+          ``observations`` (list[dict], required) — each dict maps string
+            feature names to numeric values.  All dicts should share the same
+            keys; missing values are filled with 0.  Maximum 10 000 records.
+          ``contamination`` (float, optional) — expected fraction of anomalies
+            (0 < contamination < 0.5).  Defaults to IsolationForest ``"auto"``.
+
+        Returns per-record anomaly scores and a roll-up summary.
+        """
+        payload = request.get_json(force=True, silent=True) or {}
+        observations = payload.get("observations")
+        if not observations or not isinstance(observations, list):
+            return jsonify(
+                {"error": "field 'observations' must be a non-empty list"}
+            ), 400
+        if len(observations) > 10_000:
+            return jsonify(
+                {"error": "too many observations (max 10 000)"}
+            ), 400
+
+        contamination = payload.get("contamination", "auto")
+        if contamination != "auto":
+            try:
+                contamination = float(contamination)
+                if not (0 < contamination < 0.5):
+                    raise ValueError()
+            except (TypeError, ValueError):
+                return jsonify(
+                    {"error": "contamination must be 'auto' or a float in (0, 0.5)"}
+                ), 400
+
+        try:
+            detector = AnomalyDetector(contamination=contamination)
+            report   = detector.detect(observations)
+        except (ValueError, Exception) as exc:
+            return jsonify({"error": str(exc)}), 400
+
+        return jsonify({
+            "total_observations": report.total_observations,
+            "anomaly_count":      report.anomaly_count,
+            "contamination":      report.contamination,
+            "records": [
+                {
+                    "index":         r.index,
+                    "anomaly_score": r.anomaly_score,
+                    "is_anomaly":    r.is_anomaly,
+                    "risk_label":    r.risk_label,
+                }
+                for r in report.records
             ],
         }), 200
 

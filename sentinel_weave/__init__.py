@@ -22,6 +22,12 @@ Combines:
     - Vulnerability assessment against known CVE patterns
     - Password / credential strength auditing
     - Passive DNS reconnaissance
+* Advanced offensive security strategies (authorized use only):
+    - Shellcode disassembly & classification (Capstone)
+    - YARA malware rule scanning (yara-python)
+    - ML-based anomaly detection on scan data (scikit-learn + pandas)
+    - Binary security-mitigation auditing & ROP gadget discovery (pwntools)
+    - Memory forensics: process/network/injection analysis (Volatility 3)
 """
 
 __version__ = "0.3.0"
@@ -55,6 +61,18 @@ from .red_team_toolkit import (
     ReconScanner, ReconResult,
     summarize_scan,
     COMMON_PORTS, WEB_PORTS, DB_PORTS, ADMIN_PORTS,
+)
+from .advanced_offensive import (
+    # Shellcode analysis (Capstone)
+    ShellcodeAnalyzer, ShellcodeAnalysisResult, DisassembledInstruction,
+    # YARA scanning
+    YaraScanner, YaraMatch, YaraScanResult, BUILTIN_RULE_NAMES,
+    # ML anomaly detection (scikit-learn + pandas)
+    AnomalyDetector, AnomalyRecord, AnomalyReport,
+    # Binary auditing (pwntools)
+    BinaryAuditor, MitigationReport, RopGadget, BinaryAuditResult,
+    # Memory forensics (Volatility 3)
+    MemoryForensicsScanner, ProcessEntry, NetworkEntry, ForensicsReport,
 )
 
 __all__ = [
@@ -120,4 +138,28 @@ __all__ = [
     "WEB_PORTS",
     "DB_PORTS",
     "ADMIN_PORTS",
+    # Advanced offensive security strategies (authorized use only)
+    # Shellcode analysis
+    "ShellcodeAnalyzer",
+    "ShellcodeAnalysisResult",
+    "DisassembledInstruction",
+    # YARA scanning
+    "YaraScanner",
+    "YaraMatch",
+    "YaraScanResult",
+    "BUILTIN_RULE_NAMES",
+    # ML anomaly detection
+    "AnomalyDetector",
+    "AnomalyRecord",
+    "AnomalyReport",
+    # Binary auditing
+    "BinaryAuditor",
+    "MitigationReport",
+    "RopGadget",
+    "BinaryAuditResult",
+    # Memory forensics
+    "MemoryForensicsScanner",
+    "ProcessEntry",
+    "NetworkEntry",
+    "ForensicsReport",
 ]
