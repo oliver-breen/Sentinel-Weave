@@ -14,6 +14,7 @@ from __future__ import annotations
 import sys
 import os
 import json
+import random
 import tempfile
 import unittest
 
@@ -559,6 +560,637 @@ class TestCLIAnalyze(unittest.TestCase):
             self.assertEqual(rc, 0)
         finally:
             os.unlink(path)
+
+
+
+
+# ===========================================================================
+# ThreatCorrelator tests
+# ===========================================================================
+
+from sentinel_weave.threat_correlator import ThreatCorrelator, AttackCampaign
+from sentinel_weave.event_analyzer    import SecurityEvent
+
+
+def _make_report(
+    ip: str | None = None,
+    score: float = 0.5,
+    sigs: list[str] | None = None,
+    threat_level: ThreatLevel = ThreatLevel.HIGH,
+    timestamp_sec: float | None = None,
+) -> ThreatReport:
+    """Build a minimal ThreatReport for correlator testing."""
+    from datetime import datetime, timezone
+    ts = (
+        datetime.fromtimestamp(timestamp_sec, tz=timezone.utc)
+        if timestamp_sec is not None else None
+    )
+    event = SecurityEvent(
+        raw="test event",
+        source_ip=ip,
+        timestamp=ts,
+        matched_sigs=sigs or [],
+        features=[0.1] * 13,
+        severity=0.5,
+    )
+    return ThreatReport(
+        event=event,
+        threat_level=threat_level,
+        anomaly_score=score,
+    )
+
+
+class TestThreatCorrelatorBasic(unittest.TestCase):
+    """Verify basic add/count behaviour."""
+
+    def setUp(self) -> None:
+        self.corr = ThreatCorrelator(time_window_seconds=300, min_events=2)
+
+    def test_empty_correlator_no_campaigns(self) -> None:
+        self.assertEqual(self.corr.get_campaigns(), [])
+
+    def test_empty_top_attackers(self) -> None:
+        self.assertEqual(self.corr.get_top_attackers(), [])
+
+    def test_report_without_ip_not_tracked_for_campaigns(self) -> None:
+        self.corr.add_report(_make_report(ip=None, score=0.8))
+        self.corr.add_report(_make_report(ip=None, score=0.8))
+        self.assertEqual(self.corr.get_campaigns(), [])
+
+    def test_total_counts_tracks_all_ips(self) -> None:
+        self.corr.add_report(_make_report(ip="1.2.3.4", score=0.8))
+        self.corr.add_report(_make_report(ip="1.2.3.4", score=0.8))
+        self.corr.add_report(_make_report(ip="5.6.7.8", score=0.8))
+        top = self.corr.get_top_attackers()
+        ips = [ip for ip, _ in top]
+        self.assertIn("1.2.3.4", ips)
+        self.assertIn("5.6.7.8", ips)
+
+    def test_top_attackers_sorted_descending(self) -> None:
+        for _ in range(3):
+            self.corr.add_report(_make_report(ip="10.0.0.1", score=0.8))
+        self.corr.add_report(_make_report(ip="10.0.0.2", score=0.8))
+        top = self.corr.get_top_attackers()
+        self.assertEqual(top[0][0], "10.0.0.1")
+        self.assertGreater(top[0][1], top[1][1])
+
+    def test_add_reports_bulk(self) -> None:
+        reports = [_make_report(ip="9.9.9.9", score=0.6, timestamp_sec=float(i))
+                   for i in range(5)]
+        self.corr.add_reports(reports)
+        campaigns = self.corr.get_campaigns()
+        self.assertEqual(len(campaigns), 1)
+        self.assertEqual(campaigns[0].attacker_ip, "9.9.9.9")
+
+    def test_report_below_min_score_not_in_campaign(self) -> None:
+        low_corr = ThreatCorrelator(min_score=0.5)
+        for _ in range(5):
+            low_corr.add_report(_make_report(ip="1.1.1.1", score=0.1))
+        self.assertEqual(low_corr.get_campaigns(), [])
+
+
+class TestThreatCorrelatorCampaigns(unittest.TestCase):
+    """Verify campaign detection, grouping, and attributes."""
+
+    def setUp(self) -> None:
+        self.corr = ThreatCorrelator(time_window_seconds=300, min_events=2)
+
+    def test_same_ip_forms_one_campaign(self) -> None:
+        for i in range(3):
+            self.corr.add_report(_make_report(ip="192.168.1.1", score=0.6,
+                                              timestamp_sec=float(i * 10)))
+        campaigns = self.corr.get_campaigns()
+        self.assertEqual(len(campaigns), 1)
+
+    def test_different_ips_separate_campaigns(self) -> None:
+        for i in range(2):
+            self.corr.add_report(_make_report(ip="1.1.1.1", score=0.6,
+                                              timestamp_sec=float(i * 10)))
+        for i in range(2):
+            self.corr.add_report(_make_report(ip="2.2.2.2", score=0.6,
+                                              timestamp_sec=float(i * 10)))
+        campaigns = self.corr.get_campaigns()
+        ips = {c.attacker_ip for c in campaigns}
+        self.assertIn("1.1.1.1", ips)
+        self.assertIn("2.2.2.2", ips)
+
+    def test_campaign_event_count(self) -> None:
+        for i in range(4):
+            self.corr.add_report(_make_report(ip="3.3.3.3", score=0.6,
+                                              timestamp_sec=float(i * 5)))
+        c = self.corr.get_campaigns()[0]
+        self.assertEqual(c.event_count, 4)
+
+    def test_campaign_peak_score(self) -> None:
+        for score in [0.3, 0.7, 0.5]:
+            self.corr.add_report(_make_report(ip="4.4.4.4", score=score,
+                                              timestamp_sec=float(score * 100)))
+        c = self.corr.get_campaigns()[0]
+        self.assertAlmostEqual(c.peak_score, 0.7, places=4)
+
+    def test_campaign_collects_signatures(self) -> None:
+        self.corr.add_report(_make_report(ip="5.5.5.5", score=0.6,
+                                          sigs=["SSH_BRUTE_FORCE"],
+                                          timestamp_sec=0.0))
+        self.corr.add_report(_make_report(ip="5.5.5.5", score=0.6,
+                                          sigs=["PORT_SCAN"],
+                                          timestamp_sec=10.0))
+        c = self.corr.get_campaigns()[0]
+        self.assertIn("SSH_BRUTE_FORCE", c.signatures)
+        self.assertIn("PORT_SCAN", c.signatures)
+
+    def test_campaign_type_brute_force(self) -> None:
+        for i in range(3):
+            self.corr.add_report(_make_report(ip="6.6.6.6", score=0.6,
+                                              sigs=["SSH_BRUTE_FORCE"],
+                                              timestamp_sec=float(i * 10)))
+        c = self.corr.get_campaigns()[0]
+        self.assertEqual(c.campaign_type, "BRUTE_FORCE")
+
+    def test_campaign_kill_chain_reconnaissance(self) -> None:
+        for i in range(2):
+            self.corr.add_report(_make_report(ip="7.7.7.7", score=0.6,
+                                              sigs=["PORT_SCAN"],
+                                              timestamp_sec=float(i * 10)))
+        c = self.corr.get_campaigns()[0]
+        self.assertEqual(c.kill_chain_phase, "RECONNAISSANCE")
+
+    def test_campaign_kill_chain_furthest_phase(self) -> None:
+        """PRIVILEGE_ESCALATION should beat RECONNAISSANCE."""
+        self.corr.add_report(_make_report(ip="8.8.8.8", score=0.6,
+                                          sigs=["PORT_SCAN"],
+                                          timestamp_sec=0.0))
+        self.corr.add_report(_make_report(ip="8.8.8.8", score=0.6,
+                                          sigs=["PRIVILEGE_ESCALATION"],
+                                          timestamp_sec=10.0))
+        c = self.corr.get_campaigns()[0]
+        self.assertEqual(c.kill_chain_phase, "PRIVILEGE_ESCALATION")
+
+    def test_severity_escalated_for_many_events(self) -> None:
+        """4+ events → severity escalated above single-event max."""
+        base_level = ThreatLevel.MEDIUM
+        for i in range(4):
+            self.corr.add_report(_make_report(ip="9.9.9.0", score=0.4,
+                                              threat_level=base_level,
+                                              timestamp_sec=float(i * 5)))
+        c = self.corr.get_campaigns()[0]
+        order = list(ThreatLevel)
+        self.assertGreater(order.index(c.severity), order.index(base_level))
+
+    def test_campaigns_sorted_by_severity(self) -> None:
+        # critical IP
+        for i in range(2):
+            self.corr.add_report(_make_report(ip="10.0.0.1", score=0.9,
+                                              threat_level=ThreatLevel.CRITICAL,
+                                              timestamp_sec=float(i)))
+        # low IP
+        for i in range(2):
+            self.corr.add_report(_make_report(ip="10.0.0.2", score=0.1,
+                                              threat_level=ThreatLevel.LOW,
+                                              timestamp_sec=float(i)))
+        camps = self.corr.get_campaigns()
+        self.assertEqual(camps[0].attacker_ip, "10.0.0.1")
+
+    def test_min_events_threshold_filters(self) -> None:
+        """Single event should not form a campaign with min_events=2."""
+        corr = ThreatCorrelator(min_events=2)
+        corr.add_report(_make_report(ip="1.2.3.4", score=0.9, timestamp_sec=0.0))
+        self.assertEqual(corr.get_campaigns(), [])
+
+    def test_campaign_summary_string(self) -> None:
+        for i in range(2):
+            self.corr.add_report(_make_report(ip="11.0.0.1", score=0.5,
+                                              timestamp_sec=float(i * 10)))
+        c = self.corr.get_campaigns()[0]
+        s = c.summary()
+        self.assertIn("11.0.0.1", s)
+        self.assertIsInstance(s, str)
+
+    def test_summary_stats_keys(self) -> None:
+        self.corr.add_report(_make_report(ip="12.0.0.1", score=0.5, timestamp_sec=0.0))
+        self.corr.add_report(_make_report(ip="12.0.0.1", score=0.5, timestamp_sec=10.0))
+        stats = self.corr.summary_stats()
+        for key in ("unique_ips", "total_reports", "campaign_count",
+                    "top_campaign_severity", "most_common_phase"):
+            self.assertIn(key, stats)
+
+    def test_out_of_window_events_separate_campaigns(self) -> None:
+        """Events 1 hour apart should be in separate campaign buckets."""
+        corr = ThreatCorrelator(time_window_seconds=300, min_events=2)
+        for i in range(2):
+            corr.add_report(_make_report(ip="13.0.0.1", score=0.5,
+                                         timestamp_sec=float(i * 10)))
+        for i in range(2):
+            corr.add_report(_make_report(ip="13.0.0.1", score=0.5,
+                                         timestamp_sec=float(3600 + i * 10)))
+        camps = corr.get_campaigns()
+        self.assertEqual(len(camps), 2)
+
+    def test_no_timestamp_reports_still_correlate(self) -> None:
+        """Reports without timestamps should still form a campaign together."""
+        corr = ThreatCorrelator(min_events=2)
+        for _ in range(3):
+            corr.add_report(_make_report(ip="14.0.0.1", score=0.6,
+                                         timestamp_sec=None))
+        camps = corr.get_campaigns()
+        self.assertEqual(len(camps), 1)
+        self.assertIsNone(camps[0].first_seen)
+        self.assertIsNone(camps[0].duration_seconds)
+
+
+# ===========================================================================
+# ML Pipeline tests
+# ===========================================================================
+
+from sentinel_weave.ml_pipeline import (
+    SecurityClassifier, DatasetBuilder, LabeledEvent, evaluate_classifier,
+)
+
+
+def _make_labeled(label: int, scale: float = 1.0) -> LabeledEvent:
+    """Create a synthetic labeled event with simple separable features."""
+    features = [scale * (0.9 if label == 1 else 0.1)] * 13
+    return LabeledEvent(features=features, label=label)
+
+
+def _separable_dataset(n: int = 60) -> list[LabeledEvent]:
+    """Create a linearly separable dataset (equal classes)."""
+    half = n // 2
+    return [_make_labeled(1) for _ in range(half)] + \
+           [_make_labeled(0) for _ in range(half)]
+
+
+class TestLabeledEvent(unittest.TestCase):
+
+    def test_default_weight(self) -> None:
+        ev = LabeledEvent(features=[0.0] * 13, label=0)
+        self.assertEqual(ev.weight, 1.0)
+
+    def test_custom_weight(self) -> None:
+        ev = LabeledEvent(features=[0.0] * 13, label=1, weight=2.5)
+        self.assertEqual(ev.weight, 2.5)
+
+
+class TestDatasetBuilder(unittest.TestCase):
+
+    def _make_reports(self) -> list:
+        analyzer = EventAnalyzer()
+        detector = ThreatDetector()
+        lines = [
+            "Failed password for root from 1.2.3.4",
+            "Normal backup completed successfully",
+            "SQL UNION SELECT attack from 5.6.7.8",
+            "Cron job finished",
+            "Port scan detected from 9.9.9.9",
+            "Service nginx started",
+        ]
+        events = analyzer.parse_bulk(lines)
+        return detector.analyze_bulk(events)
+
+    def test_from_reports_returns_list(self) -> None:
+        reports = self._make_reports()
+        dataset = DatasetBuilder.from_reports(reports)
+        self.assertIsInstance(dataset, list)
+
+    def test_from_reports_length_matches(self) -> None:
+        reports = self._make_reports()
+        dataset = DatasetBuilder.from_reports(reports)
+        self.assertLessEqual(len(dataset), len(reports))
+
+    def test_labels_are_binary(self) -> None:
+        dataset = DatasetBuilder.from_reports(self._make_reports())
+        for ev in dataset:
+            self.assertIn(ev.label, (0, 1))
+
+    def test_features_length_13(self) -> None:
+        dataset = DatasetBuilder.from_reports(self._make_reports())
+        for ev in dataset:
+            self.assertEqual(len(ev.features), 13)
+
+    def test_balance_oversample_equal_classes(self) -> None:
+        positives = [_make_labeled(1) for _ in range(5)]
+        negatives = [_make_labeled(0) for _ in range(20)]
+        balanced  = DatasetBuilder.balance(positives + negatives, strategy="oversample")
+        pos = sum(1 for e in balanced if e.label == 1)
+        neg = sum(1 for e in balanced if e.label == 0)
+        self.assertEqual(pos, neg)
+
+    def test_balance_undersample_equal_classes(self) -> None:
+        positives = [_make_labeled(1) for _ in range(5)]
+        negatives = [_make_labeled(0) for _ in range(20)]
+        balanced  = DatasetBuilder.balance(positives + negatives, strategy="undersample")
+        pos = sum(1 for e in balanced if e.label == 1)
+        neg = sum(1 for e in balanced if e.label == 0)
+        self.assertEqual(pos, neg)
+
+    def test_balance_invalid_strategy_raises(self) -> None:
+        with self.assertRaises(ValueError):
+            DatasetBuilder.balance([_make_labeled(0), _make_labeled(1)],
+                                   strategy="magic")
+
+    def test_split_sizes(self) -> None:
+        dataset     = _separable_dataset(20)
+        train, test = DatasetBuilder.split(dataset, test_ratio=0.2)
+        self.assertEqual(len(train) + len(test), 20)
+
+    def test_split_sum_equals_total(self) -> None:
+        dataset     = _separable_dataset(50)
+        train, test = DatasetBuilder.split(dataset, test_ratio=0.3)
+        self.assertEqual(len(train) + len(test), 50)
+
+    def test_split_test_ratio_respected(self) -> None:
+        dataset     = _separable_dataset(100)
+        _, test     = DatasetBuilder.split(dataset, test_ratio=0.20)
+        self.assertAlmostEqual(len(test) / 100, 0.20, delta=0.05)
+
+
+class TestSecurityClassifier(unittest.TestCase):
+
+    def setUp(self) -> None:
+        self.clf     = SecurityClassifier(learning_rate=0.1, epochs=100)
+        self.dataset = _separable_dataset(80)
+        self.train, self.test = DatasetBuilder.split(self.dataset)
+
+    def test_predict_proba_in_range_before_training(self) -> None:
+        p = self.clf.predict_proba([0.5] * 13)
+        self.assertGreaterEqual(p, 0.0)
+        self.assertLessEqual(p, 1.0)
+
+    def test_predict_returns_binary_before_training(self) -> None:
+        pred = self.clf.predict([0.5] * 13)
+        self.assertIn(pred, (0, 1))
+
+    def test_train_returns_history_dict(self) -> None:
+        history = self.clf.train(self.train)
+        self.assertIsInstance(history, dict)
+
+    def test_history_required_keys(self) -> None:
+        history = self.clf.train(self.train)
+        for key in ("epochs", "initial_loss", "final_loss", "loss_history"):
+            self.assertIn(key, history)
+
+    def test_loss_history_length(self) -> None:
+        history = self.clf.train(self.train)
+        self.assertEqual(len(history["loss_history"]), 100)
+
+    def test_final_loss_not_negative(self) -> None:
+        history = self.clf.train(self.train)
+        self.assertGreaterEqual(history["final_loss"], 0.0)
+
+    def test_predict_proba_in_range_after_training(self) -> None:
+        self.clf.train(self.train)
+        for ev in self.test:
+            p = self.clf.predict_proba(ev.features)
+            self.assertGreaterEqual(p, 0.0)
+            self.assertLessEqual(p, 1.0)
+
+    def test_predict_returns_binary_after_training(self) -> None:
+        self.clf.train(self.train)
+        for ev in self.test:
+            self.assertIn(self.clf.predict(ev.features), (0, 1))
+
+    def test_accuracy_on_separable_data(self) -> None:
+        """Well-trained classifier should achieve > 0.7 accuracy on easy data."""
+        clf = SecurityClassifier(learning_rate=0.1, epochs=300)
+        clf.train(self.train)
+        metrics = clf.evaluate(self.test)
+        self.assertGreater(metrics["accuracy"], 0.70)
+
+    def test_robustness_on_noisy_data(self) -> None:
+        """Classifier should still learn above chance on overlapping distributions."""
+        rng = random.Random(99)
+        noisy: list[LabeledEvent] = []
+        for _ in range(60):
+            # Threat features: mean 0.7 with noise
+            feats = [max(0.0, min(1.0, 0.7 + rng.gauss(0, 0.2))) for _ in range(13)]
+            noisy.append(LabeledEvent(features=feats, label=1))
+        for _ in range(60):
+            # Benign features: mean 0.3 with noise
+            feats = [max(0.0, min(1.0, 0.3 + rng.gauss(0, 0.2))) for _ in range(13)]
+            noisy.append(LabeledEvent(features=feats, label=0))
+        train_n, test_n = DatasetBuilder.split(noisy, test_ratio=0.2)
+        clf = SecurityClassifier(learning_rate=0.1, epochs=300)
+        clf.train(train_n)
+        metrics = clf.evaluate(test_n)
+        # On noisy but separable distributions, accuracy should beat random (0.5)
+        self.assertGreater(metrics["accuracy"], 0.5)
+
+    def test_evaluate_returns_all_keys(self) -> None:
+        self.clf.train(self.train)
+        metrics = self.clf.evaluate(self.test)
+        for key in ("accuracy", "precision", "recall", "f1",
+                    "true_positives", "false_positives",
+                    "true_negatives", "false_negatives"):
+            self.assertIn(key, metrics)
+
+    def test_evaluate_accuracy_in_range(self) -> None:
+        self.clf.train(self.train)
+        metrics = self.clf.evaluate(self.test)
+        self.assertGreaterEqual(metrics["accuracy"], 0.0)
+        self.assertLessEqual(metrics["accuracy"], 1.0)
+
+    def test_train_empty_dataset_raises(self) -> None:
+        with self.assertRaises(ValueError):
+            self.clf.train([])
+
+    def test_save_and_load_round_trip(self) -> None:
+        self.clf.train(self.train)
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as fh:
+            path = fh.name
+        try:
+            self.clf.save(path)
+            loaded = SecurityClassifier.load(path)
+            self.assertEqual(self.clf.weights, loaded.weights)
+        finally:
+            os.unlink(path)
+
+    def test_loaded_model_predicts_same(self) -> None:
+        self.clf.train(self.train)
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as fh:
+            path = fh.name
+        try:
+            self.clf.save(path)
+            loaded = SecurityClassifier.load(path)
+            sample = self.test[0].features
+            self.assertEqual(self.clf.predict(sample), loaded.predict(sample))
+        finally:
+            os.unlink(path)
+
+    def test_load_invalid_file_raises(self) -> None:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as fh:
+            json.dump({"model_type": "wrong"}, fh)
+            path = fh.name
+        try:
+            with self.assertRaises(ValueError):
+                SecurityClassifier.load(path)
+        finally:
+            os.unlink(path)
+
+    def test_to_azure_ml_schema_keys(self) -> None:
+        schema = self.clf.to_azure_ml_schema()
+        for key in ("model_spec", "input_schema", "score_function_stub"):
+            self.assertIn(key, schema)
+
+    def test_azure_ml_schema_n_features(self) -> None:
+        schema = self.clf.to_azure_ml_schema()
+        self.assertEqual(schema["model_spec"]["n_features"], 13)
+
+    def test_azure_ml_schema_input_names_length(self) -> None:
+        schema = self.clf.to_azure_ml_schema()
+        self.assertEqual(len(schema["input_schema"]["names"]), 13)
+
+    def test_azure_ml_score_stub_is_string(self) -> None:
+        schema = self.clf.to_azure_ml_schema()
+        self.assertIsInstance(schema["score_function_stub"], str)
+        self.assertIn("def score", schema["score_function_stub"])
+
+
+class TestEvaluateClassifierHelper(unittest.TestCase):
+
+    def _make_reports_for_ml(self) -> list:
+        analyzer = EventAnalyzer()
+        detector = ThreatDetector()
+        lines = (
+            ["Failed password for root from 1.2.3.4"] * 10
+            + ["SQL UNION SELECT attack"] * 10
+            + ["Port scan from 9.9.9.9"] * 10
+            + ["Normal backup completed"] * 10
+            + ["Service nginx started OK"] * 10
+            + ["Cron job finished successfully"] * 10
+        )
+        return detector.analyze_bulk(analyzer.parse_bulk(lines))
+
+    def test_returns_classifier_and_metrics(self) -> None:
+        reports = self._make_reports_for_ml()
+        clf, metrics = evaluate_classifier(reports, epochs=50)
+        self.assertIsInstance(clf, SecurityClassifier)
+        self.assertIn("accuracy", metrics)
+
+    def test_too_few_reports_raises(self) -> None:
+        analyzer = EventAnalyzer()
+        detector = ThreatDetector()
+        reports  = detector.analyze_bulk(analyzer.parse_bulk(["line1", "line2"]))
+        with self.assertRaises(ValueError):
+            evaluate_classifier(reports)
+
+
+# ===========================================================================
+# CLI correlate and train smoke-tests
+# ===========================================================================
+
+class TestCLICorrelate(unittest.TestCase):
+
+    def _write_log(self, lines: list[str]) -> str:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".log", delete=False) as fh:
+            fh.write("\n".join(lines))
+            return fh.name
+
+    def test_correlate_exits_zero(self) -> None:
+        import argparse
+        from sentinel_weave.cli import cmd_correlate
+        path = self._write_log([
+            "Jan 15 10:00:00 server sshd: Failed password for root from 192.168.1.1",
+            "Jan 15 10:00:05 server sshd: Failed password for admin from 192.168.1.1",
+            "Jan 15 10:00:10 server sshd: Failed password for alice from 192.168.1.1",
+        ])
+        try:
+            args = argparse.Namespace(
+                file=path, window=300, min_events=2, top=10, top_attackers=5,
+            )
+            rc = cmd_correlate(args)
+            self.assertEqual(rc, 0)
+        finally:
+            os.unlink(path)
+
+    def test_correlate_empty_file_returns_nonzero(self) -> None:
+        import argparse
+        from sentinel_weave.cli import cmd_correlate
+        path = self._write_log([])
+        try:
+            args = argparse.Namespace(
+                file=path, window=300, min_events=2, top=10, top_attackers=0,
+            )
+            rc = cmd_correlate(args)
+            self.assertNotEqual(rc, 0)
+        finally:
+            os.unlink(path)
+
+
+class TestCLITrain(unittest.TestCase):
+
+    def _write_log(self, lines: list[str]) -> str:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".log", delete=False) as fh:
+            fh.write("\n".join(lines))
+            return fh.name
+
+    def test_train_exits_zero(self) -> None:
+        import argparse
+        from sentinel_weave.cli import cmd_train
+        lines = (
+            ["Failed password for root from 1.2.3.4"] * 10
+            + ["SQL UNION SELECT attack from 5.6.7.8"] * 10
+            + ["Normal backup completed OK"] * 10
+            + ["Service nginx started OK"] * 10
+        )
+        path = self._write_log(lines)
+        try:
+            args = argparse.Namespace(
+                file=path, epochs=50, test_ratio=0.25,
+                output=None, azure_export=None,
+            )
+            rc = cmd_train(args)
+            self.assertEqual(rc, 0)
+        finally:
+            os.unlink(path)
+
+    def test_train_saves_model_file(self) -> None:
+        import argparse
+        from sentinel_weave.cli import cmd_train
+        lines = (
+            ["Failed password for root from 1.2.3.4"] * 10
+            + ["SQL UNION SELECT attack from 5.6.7.8"] * 10
+            + ["Normal backup OK"] * 10
+            + ["Service nginx started OK"] * 10
+        )
+        log_path   = self._write_log(lines)
+        model_path = log_path.replace(".log", ".model.json")
+        try:
+            args = argparse.Namespace(
+                file=log_path, epochs=50, test_ratio=0.25,
+                output=model_path, azure_export=None,
+            )
+            cmd_train(args)
+            self.assertTrue(os.path.exists(model_path))
+        finally:
+            os.unlink(log_path)
+            if os.path.exists(model_path):
+                os.unlink(model_path)
+
+    def test_train_saves_azure_export(self) -> None:
+        import argparse
+        from sentinel_weave.cli import cmd_train
+        lines = (
+            ["Failed password for root from 1.2.3.4"] * 10
+            + ["SQL UNION SELECT attack from 5.6.7.8"] * 10
+            + ["Normal backup completed OK"] * 10
+            + ["Service nginx started OK"] * 10
+        )
+        log_path    = self._write_log(lines)
+        azure_path  = log_path.replace(".log", ".azure.json")
+        try:
+            args = argparse.Namespace(
+                file=log_path, epochs=50, test_ratio=0.25,
+                output=None, azure_export=azure_path,
+            )
+            cmd_train(args)
+            self.assertTrue(os.path.exists(azure_path))
+            with open(azure_path) as fh:
+                schema = json.load(fh)
+            self.assertIn("model_spec", schema)
+        finally:
+            os.unlink(log_path)
+            if os.path.exists(azure_path):
+                os.unlink(azure_path)
 
 
 if __name__ == "__main__":

@@ -28,9 +28,11 @@ import sys
 import os
 import base64
 
-from .event_analyzer import EventAnalyzer
-from .threat_detector import ThreatDetector, summarize_reports, ThreatLevel
+from .event_analyzer    import EventAnalyzer
+from .threat_detector   import ThreatDetector, summarize_reports, ThreatLevel
 from .azure_integration import TextAnalyticsClient, SecurityTelemetry
+from .threat_correlator import ThreatCorrelator
+from .ml_pipeline       import DatasetBuilder, SecurityClassifier, evaluate_classifier
 
 
 # ---------------------------------------------------------------------------
@@ -223,6 +225,113 @@ def cmd_decrypt(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_correlate(args: argparse.Namespace) -> int:
+    """Detect coordinated attack campaigns in a log file."""
+    analyzer   = EventAnalyzer()
+    detector   = ThreatDetector()
+    correlator = ThreatCorrelator(
+        time_window_seconds=args.window,
+        min_events=args.min_events,
+    )
+
+    if args.file == "-":
+        lines = sys.stdin.read().splitlines()
+    else:
+        with open(args.file, encoding="utf-8", errors="replace") as fh:
+            lines = fh.read().splitlines()
+
+    if not lines:
+        print("No log lines found.", file=sys.stderr)
+        return 1
+
+    events  = analyzer.parse_bulk(lines)
+    reports = detector.analyze_bulk(events)
+    correlator.add_reports(reports)
+
+    campaigns = correlator.get_campaigns()
+    stats     = correlator.summary_stats()
+
+    print(_c("\n═══ SentinelWeave — Campaign Correlation ═══", "BOLD"))
+    print(f"  Log file       : {args.file}")
+    print(f"  Unique IPs     : {stats['unique_ips']}")
+    print(f"  Total reports  : {stats['total_reports']}")
+    print(f"  Campaigns found: {stats['campaign_count']}")
+    print(f"  Top severity   : {stats['top_campaign_severity']}")
+    print(f"  Common phase   : {stats['most_common_phase']}")
+
+    if not campaigns:
+        print(_c("\n  No campaigns detected.", "DIM"))
+    else:
+        print(_c(f"\n  Detected campaigns ({len(campaigns)}):", "BOLD"))
+        for i, c in enumerate(campaigns[:args.top], 1):
+            col = _LEVEL_COLOUR.get(c.severity.value, "")
+            print(f"    {i}. {col}{c.summary()}{_COLOURS['RESET']}")
+
+    if args.top_attackers:
+        top = correlator.get_top_attackers(n=args.top_attackers)
+        if top:
+            print(_c("\n  Top attackers by event count:", "BOLD"))
+            for ip, count in top:
+                print(f"    {_c(ip, 'RED')}  ×{count}")
+
+    print()
+    return 0
+
+
+def cmd_train(args: argparse.Namespace) -> int:
+    """Train a logistic regression threat classifier from a log file."""
+    analyzer = EventAnalyzer()
+    detector = ThreatDetector()
+
+    with open(args.file, encoding="utf-8", errors="replace") as fh:
+        lines = fh.read().splitlines()
+
+    if not lines:
+        print("No log lines found.", file=sys.stderr)
+        return 1
+
+    events  = analyzer.parse_bulk(lines)
+    reports = detector.analyze_bulk(events)
+
+    print(_c("\n═══ SentinelWeave — ML Classifier Training ═══", "BOLD"))
+    print(f"  Log file     : {args.file}")
+    print(f"  Events parsed: {len(events)}")
+
+    try:
+        clf, metrics = evaluate_classifier(
+            reports,
+            epochs=args.epochs,
+            test_ratio=args.test_ratio,
+        )
+    except ValueError as exc:
+        print(f"  Error: {exc}", file=sys.stderr)
+        return 1
+
+    print(f"\n  Training complete ({args.epochs} epochs):")
+    print(f"    Accuracy  : {metrics['accuracy']:.4f}")
+    print(f"    Precision : {metrics['precision']:.4f}")
+    print(f"    Recall    : {metrics['recall']:.4f}")
+    print(f"    F1 score  : {metrics['f1']:.4f}")
+    print(f"    TP={metrics['true_positives']}  "
+          f"FP={metrics['false_positives']}  "
+          f"TN={metrics['true_negatives']}  "
+          f"FN={metrics['false_negatives']}")
+
+    if args.output:
+        clf.save(args.output)
+        print(_c(f"\n  ✔ Model saved to: {args.output}", "GREEN"))
+
+    if args.azure_export:
+        schema = clf.to_azure_ml_schema()
+        with open(args.azure_export, "w", encoding="utf-8") as fh:
+            json.dump(schema, fh, indent=2)
+        print(_c(f"  ✔ Azure ML schema exported to: {args.azure_export}", "CYAN"))
+        print("    Drop score_function_stub into your Azure ML score.py to deploy.")
+
+    print()
+    return 0
+
+
 def cmd_demo(_args: argparse.Namespace) -> int:
     """Run a built-in demonstration with synthetic security log lines."""
     DEMO_LINES = [
@@ -329,6 +438,30 @@ def build_parser() -> argparse.ArgumentParser:
     p_decrypt.add_argument("--key", default=None, help="Path to the .key.json file")
     p_decrypt.add_argument("--full", action="store_true", help="Show all events in the report")
 
+    # correlate
+    p_corr = sub.add_parser("correlate", help="Detect coordinated attack campaigns")
+    p_corr.add_argument("file", help="Log file path (use '-' for stdin)")
+    p_corr.add_argument("--window", type=int, default=300, metavar="SEC",
+                        help="Time window in seconds for event grouping (default 300)")
+    p_corr.add_argument("--min-events", type=int, default=2, metavar="N",
+                        help="Min events per IP/window to form a campaign (default 2)")
+    p_corr.add_argument("--top", type=int, default=10, metavar="N",
+                        help="Show top N campaigns (default 10)")
+    p_corr.add_argument("--top-attackers", type=int, default=5, metavar="N",
+                        help="Show top N attacker IPs (0 = skip)")
+
+    # train
+    p_train = sub.add_parser("train", help="Train a logistic regression threat classifier")
+    p_train.add_argument("file", help="Log file to train on")
+    p_train.add_argument("--epochs", type=int, default=200, metavar="N",
+                         help="Training epochs (default 200)")
+    p_train.add_argument("--test-ratio", type=float, default=0.25, metavar="R",
+                         help="Fraction of data for evaluation (default 0.25)")
+    p_train.add_argument("--output", default=None, metavar="PATH",
+                         help="Save trained model to this JSON file")
+    p_train.add_argument("--azure-export", default=None, metavar="PATH",
+                         help="Export Azure ML scoring schema to this JSON file")
+
     # demo
     sub.add_parser("demo", help="Run a built-in demonstration")
 
@@ -340,10 +473,12 @@ def main() -> None:
     args   = parser.parse_args()
 
     handlers = {
-        "analyze": cmd_analyze,
-        "report":  cmd_report,
-        "decrypt": cmd_decrypt,
-        "demo":    cmd_demo,
+        "analyze":   cmd_analyze,
+        "report":    cmd_report,
+        "decrypt":   cmd_decrypt,
+        "correlate": cmd_correlate,
+        "train":     cmd_train,
+        "demo":      cmd_demo,
     }
 
     handler = handlers.get(args.command)
