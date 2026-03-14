@@ -16,12 +16,12 @@ pandas>=2.0
 # Uncomment the groups you need:
 
 # Red-team / offensive toolkit (BinaryFuzzer in sentinel_weave.advanced_offensive)
-# pwntools>=4.12
+ pwntools>=4.12
 
 # Memory forensics (MemoryForensicsScanner in sentinel_weave.advanced_offensive)
-# volatility3>=2.7
+ volatility3>=2.7
 
 # Azure integrations (sentinel_weave.azure_integration)
-# azure-storage-blob>=12.19
-# azure-ai-textanalytics>=5.3
-# azure-monitor-opentelemetry>=1.3
+ azure-storage-blob>=12.19
+ azure-ai-textanalytics>=5.3
+ azure-monitor-opentelemetry>=1.3
