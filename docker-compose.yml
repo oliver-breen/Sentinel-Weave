@@ -1,0 +1,38 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# SentinelWeave — Docker Compose
+#
+# One-command start:
+#   docker compose up --build
+#
+# Access the live dashboard at:  http://localhost:5000
+#
+# To supply Azure / feature credentials create a .env file in this directory
+# (see .env.example) and Docker Compose will pick it up automatically.
+# ──────────────────────────────────────────────────────────────────────────────
+
+services:
+  sentinel-weave:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: sentinel-weave:latest
+    container_name: sentinel-weave
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      # ── Azure integrations (optional) ─────────────────────────────────────
+      # Unset / empty values simply disable the Azure features gracefully.
+      AZURE_STORAGE_CONNECTION_STRING: "${AZURE_STORAGE_CONNECTION_STRING:-}"
+      AZURE_TEXT_ANALYTICS_ENDPOINT:   "${AZURE_TEXT_ANALYTICS_ENDPOINT:-}"
+      AZURE_TEXT_ANALYTICS_KEY:        "${AZURE_TEXT_ANALYTICS_KEY:-}"
+      AZURE_APPINSIGHTS_CONNECTION_STRING: "${AZURE_APPINSIGHTS_CONNECTION_STRING:-}"
+      SENTINELWEAVE_AZURE_ENDPOINT:    "${SENTINELWEAVE_AZURE_ENDPOINT:-}"
+      SENTINELWEAVE_AZURE_API_KEY:     "${SENTINELWEAVE_AZURE_API_KEY:-}"
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

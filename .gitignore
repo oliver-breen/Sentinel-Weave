@@ -25,6 +25,10 @@ venv/
 env/
 ENV/
 
+# Environment / secrets — never commit real credentials
+.env
+# (keep .env.example — it's the safe template)
+
 # IDEs
 .vscode/
 .idea/
