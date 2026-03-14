@@ -1,65 +1,105 @@
-# Kyber and Dilithium Python API (scaffold)
-# This module provides a unified interface for Kyber KEM and Dilithium signature schemes.
-# Backed by C/C++ reference implementations via pybind11.
+# Kyber / ML-KEM and Dilithium Python API
+# This module provides a unified interface for Kyber KEM and Dilithium
+# (Falcon-backed) signature schemes, using the pure-Python quantaweave
+# implementations through the pqcrypto package.
 
 from pqcrypto.kem import ml_kem_768
+from pqcrypto.dsa import dilithium3
 
 
+# ── Kyber KEM ─────────────────────────────────────────────────────────────────
 
-# Kyber KEM
 def kyber_keygen():
-    """Generate Kyber public/private keypair (bytes)."""
+    """Generate a Kyber keypair.
+
+    Returns:
+        dict: ``{'public_key': bytes, 'secret_key': bytes}``
+    """
     pk, sk = ml_kem_768.generate_keypair()
-    assert isinstance(pk, bytes) and isinstance(sk, bytes)
-    # Ensure sk is always the original 2400-byte secret key
-    return pk, sk
+    return {'public_key': pk, 'secret_key': sk}
+
 
 def kyber_encaps(public_key: bytes):
-    """Encapsulate a shared secret using Kyber public key (bytes)."""
-    assert isinstance(public_key, bytes)
+    """Encapsulate a shared secret using a Kyber public key.
+
+    Args:
+        public_key (bytes): Public key from :func:`kyber_keygen`.
+
+    Returns:
+        dict: ``{'ciphertext': bytes, 'shared_secret': bytes}``
+    """
     ct, ss = ml_kem_768.encrypt(public_key)
-    assert isinstance(ct, bytes) and isinstance(ss, bytes)
-    # Return ct, ss; secret key is not generated here
-    return ct, ss
+    return {'ciphertext': ct, 'shared_secret': ss}
+
 
 def kyber_decaps(ciphertext: bytes, private_key: bytes):
-    """Decapsulate a shared secret using Kyber private key (bytes)."""
-    assert isinstance(ciphertext, bytes) and isinstance(private_key, bytes)
-    # secret_key must be the original 2400-byte value from kyber_generate_keypair
-    if not isinstance(private_key, bytes) or len(private_key) != 2400:
-        raise ValueError("Kyber decapsulation requires the original 2400-byte secret key.")
-    # Ensure private_key is exactly 2400 bytes
+    """Decapsulate the shared secret from a Kyber ciphertext.
+
+    Args:
+        ciphertext (bytes): Ciphertext from :func:`kyber_encaps`.
+        private_key (bytes): Secret key from :func:`kyber_keygen`.
+
+    Returns:
+        bytes: Recovered shared secret.
+    """
+    if not isinstance(ciphertext, bytes):
+        raise TypeError(f"'ciphertext' must be bytes, got {type(ciphertext)}")
     if not isinstance(private_key, bytes):
-        raise TypeError(f"Kyber decapsulation requires 'private_key' as bytes, got {type(private_key)}")
-    if len(private_key) != 2400:
-        raise ValueError(f"Kyber decapsulation requires 'private_key' of length 2400, got {len(private_key)}")
-    ss = ml_kem_768.decrypt(ciphertext, private_key)
-    assert isinstance(ss, bytes)
-    return ss
+        raise TypeError(f"'private_key' must be bytes, got {type(private_key)}")
+    return ml_kem_768.decrypt(ciphertext, private_key)
 
-# Dilithium and signature logic removed for Kyber-only operation
-# Kyber
 
-# Function to integrate Kyber algorithm
+# ── Dilithium signatures ───────────────────────────────────────────────────────
+
+def dilithium_keygen():
+    """Generate a Dilithium signing keypair.
+
+    Returns:
+        dict: ``{'public_key': bytes, 'secret_key': bytes}``
+    """
+    pk, sk = dilithium3.generate_keypair()
+    return {'public_key': pk, 'secret_key': sk}
+
+
+def dilithium_sign(secret_key: bytes, message: bytes):
+    """Sign *message* with *secret_key*.
+
+    Args:
+        secret_key (bytes): Secret key from :func:`dilithium_keygen`.
+        message (bytes): Message to sign.
+
+    Returns:
+        bytes: Detached signature.
+    """
+    return dilithium3.sign(secret_key, message)
+
+
+def dilithium_verify(public_key: bytes, message: bytes, signature: bytes):
+    """Verify a Dilithium signature.
+
+    Args:
+        public_key (bytes): Public key from :func:`dilithium_keygen`.
+        message (bytes): Original message.
+        signature (bytes): Signature from :func:`dilithium_sign`.
+
+    Returns:
+        bool: ``True`` if valid, ``False`` otherwise.
+    """
+    return dilithium3.verify(public_key, message, signature)
+
+
+# ── Integration stubs ──────────────────────────────────────────────────────────
 
 def integrate_kyber():
-    # Placeholder for Kyber integration
+    """Placeholder for Kyber algorithm integration."""
     pass
 
-
-# Dilithium
-
-# Function to integrate Dilithium algorithm
 
 def integrate_dilithium():
-    # Placeholder for Dilithium integration
+    """Placeholder for Dilithium algorithm integration."""
     pass
 
 
-# HQC
-
-# Function to integrate HQC algorithm
-
 def integrate_hqc():
-    # Placeholder for HQC integration
+    """Placeholder for HQC algorithm integration."""
     pass

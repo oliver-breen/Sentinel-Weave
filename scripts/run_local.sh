@@ -60,7 +60,7 @@ if [[ ! -d "${VENV_DIR}" ]]; then
 fi
 
 # ── 3. Install / upgrade dependencies ─────────────────────────────────────────
-CURRENT_HASH=$(sha256sum "${ROOT_DIR}/requirements.txt" | awk '{print $1}')
+CURRENT_HASH=$(python3 -c "import hashlib, sys; print(hashlib.sha256(open(sys.argv[1], 'rb').read()).hexdigest())" "${ROOT_DIR}/requirements.txt")
 STORED_HASH=""
 [[ -f "${DEPS_HASH_FILE}" ]] && STORED_HASH=$(cat "${DEPS_HASH_FILE}")
 

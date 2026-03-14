@@ -1,155 +1,203 @@
 """
 The "QuantaWeave" Algorithm: A Robust Hybrid Post-Quantum Scheme.
 
-This module weaves together multiple post-quantum primitives into a single, cohesive algorithm.
-It combines:
-- Kyber-768 (Lattice-based KEM) for efficient key encapsulation.
-- HQC-128 (Code-based KEM) for redundancy against lattice-specific attacks.
-- Dilithium-3 (Lattice-based Signature) for authenticated key exchange.
+This module weaves together multiple post-quantum primitives into a single,
+cohesive algorithm.  It combines:
+- RSA-GCM (classical KEM) for broad compatibility.
+- Kyber-768 / ML-KEM (lattice-based KEM) for PQ security.
+- HQC-128 (code-based KEM) for redundancy against lattice-specific attacks.
+- Falcon-1024 (lattice-based signature) for data authentication.
+- Dilithium-3 (lattice-based signature, Falcon-backed) for additional
+  signature diversity.
 
-This hybrid approach ensures that the system remains secure even if one of the underlying
-mathematical problems (Lattice or Code-based) is compromised.
+This hybrid approach ensures the system remains secure even if one of the
+underlying mathematical problems is compromised.
 """
 
+import os
 import pickle
-from typing import Tuple, Any, List
+from typing import Tuple, Any, List, Dict, Optional
+
 from .pq_unified_interface import PQScheme
-from .pq_schemes import UnifiedPQHybrid, KyberScheme, HQCScheme, FalconScheme
+from .pq_schemes import (
+    UnifiedPQHybrid,
+    KyberScheme,
+    HQCScheme,
+    FalconScheme,
+    DilithiumScheme,
+    RSAGCMScheme,
+    _aes_gcm_encrypt,
+    _aes_gcm_decrypt,
+)
+
 
 class QuantaWeaveAlgorithm(PQScheme):
-    def hybrid_encrypt(self, public_key: bytes, plaintext: bytes) -> tuple:
+    """Hybrid post-quantum algorithm combining multiple KEMs and signatures."""
+
+    def __init__(self):
+        self.hybrid = UnifiedPQHybrid(
+            kem_schemes=[
+                RSAGCMScheme(),
+                KyberScheme(),
+                HQCScheme(),
+            ],
+            sig_schemes=[
+                FalconScheme(),
+                DilithiumScheme(),
+            ],
+        )
+        self._kem_ids = [
+            self.hybrid._get_scheme_id(s) for s in self.hybrid.kem_schemes
+        ]
+        self._sig_ids = [
+            self.hybrid._get_scheme_id(s) for s in self.hybrid.sig_schemes
+        ]
+
+    # ── Key generation ────────────────────────────────────────────────────────
+
+    def generate_keypair(self) -> Tuple[bytes, bytes]:
+        """Generate a unified public/secret key pair.
+
+        Returns:
+            (public_key_blob, secret_key_blob) where each blob is a pickled
+            dict mapping scheme name → key bytes.
         """
-        Hybrid encrypt: derive shared secret via KEMs, then encrypt plaintext with AES-GCM using the combined secret.
-        Returns (ciphertext_dict, aes_gcm_dict)
+        pub_keys_list, sec_keys_list = self.hybrid.generate_keypair()
+        all_ids = self._kem_ids + self._sig_ids
+        pub_key_blob = pickle.dumps(
+            {name: key for name, key in zip(all_ids, pub_keys_list)}
+        )
+        sec_key_blob = pickle.dumps(
+            {name: key for name, key in zip(all_ids, sec_keys_list)}
+        )
+        return pub_key_blob, sec_key_blob
+
+    # ── KEM encapsulate / decapsulate ─────────────────────────────────────────
+
+    def encapsulate(self, public_key: bytes) -> Tuple[Dict, Dict]:
+        """Encapsulate a shared secret using all KEM schemes.
+
+        Args:
+            public_key (bytes): Pickled public key dict from :meth:`generate_keypair`.
+
+        Returns:
+            (ciphertexts_dict, result_dict) where *result_dict* is
+            ``{'combined_secret': bytes}``.
         """
         try:
             pub_key_obj = pickle.loads(public_key)
         except Exception:
             pub_key_obj = public_key
-        result = self.hybrid.encapsulate(pub_key_obj, plaintext=plaintext)
-        return result["ct"], result["aes_gcm"]
+        if isinstance(pub_key_obj, dict):
+            pk_map = {k: pub_key_obj[k] for k in self._kem_ids if k in pub_key_obj}
+        else:
+            pk_map = {name: k for name, k in zip(self._kem_ids, pub_key_obj)}
+        ciphertexts, shared_secret = self.hybrid.encapsulate(pk_map)
+        return ciphertexts, {'combined_secret': shared_secret}
 
-    def hybrid_decrypt(self, ciphertext: dict, secret_key: bytes, aes_gcm: dict) -> bytes:
-        """
-        Hybrid decrypt: derive shared secret via KEMs, then decrypt AES-GCM ciphertext using the combined secret.
+    def decapsulate(self, ciphertext: Dict, secret_key: bytes) -> Dict:
+        """Decapsulate the shared secret.
+
+        Args:
+            ciphertext: Ciphertexts dict from :meth:`encapsulate`.
+            secret_key (bytes): Pickled secret key dict from :meth:`generate_keypair`.
+
+        Returns:
+            dict: ``{'combined_secret': bytes}`` with the recovered shared secret.
         """
         try:
             sec_key_obj = pickle.loads(secret_key)
         except Exception:
             sec_key_obj = secret_key
-        plaintext = self.hybrid.decapsulate(ciphertext, sec_key_obj, aes_gcm=aes_gcm)
-        return plaintext
-    def sign(self, message: bytes, secret_key: bytes) -> bytes:
-        """Hybrid sign using all signature schemes (e.g., Dilithium, Falcon)."""
-        # For hybrid, secret_key is a pickled list if multiple schemes, else raw bytes
-        if isinstance(secret_key, bytes):
-            try:
-                sec_keys_list = pickle.loads(secret_key)
-            except Exception:
-                sec_keys_list = [secret_key]
+        if isinstance(sec_key_obj, dict):
+            sk_map = {k: sec_key_obj[k] for k in self._kem_ids if k in sec_key_obj}
         else:
-            sec_keys_list = secret_key
-        sigs = self.hybrid.sign(message, sec_keys_list)
-        # For single-scheme, return raw bytes; for hybrid, pickle the list
+            sk_map = {name: k for name, k in zip(self._kem_ids, sec_key_obj)}
+        shared_secret = self.hybrid.decapsulate(ciphertext, sk_map)
+        return {'combined_secret': shared_secret}
+
+    # ── Hybrid KEM + AES-GCM encryption ──────────────────────────────────────
+
+    def hybrid_encrypt(self, public_key: bytes, plaintext: bytes) -> Tuple[Dict, Dict]:
+        """Encrypt *plaintext* using hybrid KEM + AES-256-GCM.
+
+        Args:
+            public_key (bytes): Pickled public key dict.
+            plaintext (bytes): Plaintext to encrypt.
+
+        Returns:
+            (ciphertexts_dict, aes_gcm_dict)
+        """
+        ciphertexts, result = self.encapsulate(public_key)
+        shared_secret = result['combined_secret']
+        aes_gcm = _aes_gcm_encrypt(shared_secret, plaintext)
+        return ciphertexts, aes_gcm
+
+    def hybrid_decrypt(self, ciphertext: Dict, secret_key: bytes, aes_gcm: Dict) -> bytes:
+        """Decrypt an AES-GCM ciphertext using the hybrid KEM shared secret.
+
+        Args:
+            ciphertext: Ciphertexts dict from :meth:`hybrid_encrypt`.
+            secret_key (bytes): Pickled secret key dict.
+            aes_gcm: AES-GCM envelope from :meth:`hybrid_encrypt`.
+
+        Returns:
+            bytes: Decrypted plaintext.
+        """
+        result = self.decapsulate(ciphertext, secret_key)
+        shared_secret = result['combined_secret']
+        return _aes_gcm_decrypt(shared_secret, aes_gcm)
+
+    # ── Signatures ────────────────────────────────────────────────────────────
+
+    def sign(self, message: bytes, secret_key: bytes) -> bytes:
+        """Sign *message* with all signature schemes.
+
+        Args:
+            secret_key (bytes): Pickled secret key dict or raw bytes.
+
+        Returns:
+            bytes: Pickled list of signatures (or raw bytes for single scheme).
+        """
+        try:
+            sec_key_obj = pickle.loads(secret_key)
+        except Exception:
+            sec_key_obj = secret_key
+        if isinstance(sec_key_obj, dict):
+            # Pass the full ordered key list (KEM + sig) so sign() can apply its offset
+            all_sks = [sec_key_obj[k] for k in self._kem_ids + self._sig_ids if k in sec_key_obj]
+        elif isinstance(sec_key_obj, list):
+            all_sks = sec_key_obj
+        else:
+            all_sks = [sec_key_obj]
+        sigs = self.hybrid.sign(message, all_sks)
         return sigs[0] if len(sigs) == 1 else pickle.dumps(sigs)
 
     def verify(self, message: bytes, signature: bytes, public_key: bytes) -> bool:
-        """Hybrid verify using all signature schemes (e.g., Dilithium, Falcon)."""
-        # For hybrid, signature and public_key may be pickled lists
-        if isinstance(signature, bytes):
-            try:
-                sigs = pickle.loads(signature)
-            except Exception:
+        """Verify *signature* over *message*.
+
+        Args:
+            signature (bytes): Signature from :meth:`sign`.
+            public_key (bytes): Pickled public key dict or raw bytes.
+
+        Returns:
+            bool: ``True`` if all signatures are valid.
+        """
+        try:
+            sigs = pickle.loads(signature)
+            if not isinstance(sigs, list):
                 sigs = [signature]
-        else:
-            sigs = signature
-        if isinstance(public_key, bytes):
-            try:
-                pub_keys_list = pickle.loads(public_key)
-            except Exception:
-                pub_keys_list = [public_key]
-        else:
-            pub_keys_list = public_key
-        return self.hybrid.verify(message, sigs, pub_keys_list)
-
-    def __init__(self):
-        # True hybrid: RSA-GCM, ML-KEM (Kyber), ML-DSA (Dilithium), HQC, Falcon
-        from quantaweave.pq_schemes import HQCScheme, RSAGCMScheme, DilithiumScheme
-        self.hybrid = UnifiedPQHybrid(
-            kem_schemes=[
-                RSAGCMScheme(),
-                KyberScheme(),
-                HQCScheme()
-            ],
-            sig_schemes=[
-                FalconScheme(),
-                DilithiumScheme()
-            ]
-        )
-
-    def generate_keypair(self) -> Tuple[bytes, bytes]:
-        """
-        Generate a unified public/secret key pair for the Woven algorithm.
-        Returns raw bytes for single-scheme (Kyber, Dilithium).
-        For hybrid, serialize as a dict mapping scheme name to key to preserve key integrity.
-        """
-        pub_keys_list, sec_keys_list = self.hybrid.generate_keypair()
-        if len(pub_keys_list) == 1:
-            pub_key_blob = pub_keys_list[0]
-        else:
-            # Use explicit, stable scheme identifiers
-            scheme_ids = ["Kyber", "HQC", "Falcon"][:len(pub_keys_list)]
-            pub_key_dict = {name: key for name, key in zip(scheme_ids, pub_keys_list)}
-            pub_key_blob = pickle.dumps(pub_key_dict)
-        if len(sec_keys_list) == 1:
-            sec_key_blob = sec_keys_list[0]
-        else:
-            scheme_ids = ["Kyber", "HQC", "Falcon"][:len(sec_keys_list)]
-            sec_key_dict = {name: key for name, key in zip(scheme_ids, sec_keys_list)}
-            sec_key_blob = pickle.dumps(sec_key_dict)
-        return pub_key_blob, sec_key_blob
-
-    def encapsulate(self, public_key: bytes) -> Tuple[bytes, bytes]:
-        """
-        Encapsulate a shared secret using the Woven algorithm (Kyber).
-        For hybrid, unpickle as dict and preserve order by scheme.
-        """
+        except Exception:
+            sigs = [signature]
         try:
             pub_key_obj = pickle.loads(public_key)
-            if isinstance(pub_key_obj, dict):
-                scheme_ids = ["Kyber", "HQC", "Falcon"][:len(pub_key_obj)]
-                pub_keys_list = [pub_key_obj[name] for name in scheme_ids]
-            else:
-                pub_keys_list = pub_key_obj
         except Exception:
-            pub_keys_list = [public_key]
-        ciphertexts_list, shared_secret = self.hybrid.encapsulate(pub_keys_list)
-        if len(ciphertexts_list) == 1:
-            ciphertext_blob = ciphertexts_list[0]
+            pub_key_obj = public_key
+        if isinstance(pub_key_obj, dict):
+            # Pass the full ordered key list (KEM + sig) so verify() can apply its offset
+            all_pks = [pub_key_obj[k] for k in self._kem_ids + self._sig_ids if k in pub_key_obj]
+        elif isinstance(pub_key_obj, list):
+            all_pks = pub_key_obj
         else:
-            ciphertext_blob = pickle.dumps(ciphertexts_list)
-        return ciphertext_blob, shared_secret
-
-    def decapsulate(self, ciphertext: bytes, secret_key: bytes) -> bytes:
-        """
-        Decapsulate the shared secret using the Woven algorithm.
-        Always use the original 2400-byte Kyber secret key from keygen if available.
-        For hybrid, unpickle as dict and preserve order by scheme.
-        """
-        try:
-            ciphertexts_list = pickle.loads(ciphertext)
-        except Exception:
-            ciphertexts_list = [ciphertext]
-        try:
-            sec_key_obj = pickle.loads(secret_key)
-            if isinstance(sec_key_obj, dict):
-                scheme_ids = ["Kyber", "HQC", "Falcon"][:len(sec_key_obj)]
-                sec_keys_list = [sec_key_obj[name] for name in scheme_ids]
-            else:
-                sec_keys_list = sec_key_obj
-        except Exception:
-            sec_keys_list = [secret_key]
-        result = self.hybrid.decapsulate(ciphertexts_list, sec_keys_list)
-        return result
-
-    # Signature methods removed for Kyber-only testing
+            all_pks = [pub_key_obj]
+        return self.hybrid.verify(message, sigs, all_pks)

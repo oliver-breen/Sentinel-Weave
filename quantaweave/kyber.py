@@ -9,7 +9,6 @@ import os
 import hashlib
 from typing import List, Tuple, Dict, Any
 from .math_utils import PolynomialRing, Sampler, compress, decompress
-from pqcrypto.kem import kyber_768
 
 class KyberCore:
     """
@@ -90,11 +89,28 @@ class KyberCore:
             acc = self.ring.add(acc, prod)
         return acc
 
-    def keypair(self) -> Tuple[bytes, bytes]:
+    def keypair(self) -> Tuple[Dict, Dict]:
         """
-        Generate Kyber-768 public and secret keys using pqcrypto.
+        Generate Kyber-768 public and secret keys.
+
+        Follows the Kyber KeyGen specification:
+          1. Sample a random 32-byte seed ρ.
+          2. Expand A ← SHAKE-128(ρ).
+          3. Sample secret key s and error vector e from CBD(η₁).
+          4. Compute public key t = A·s + e (mod q).
+
+        Returns:
+            (pk, sk) where pk = {'seed': bytes, 't': List[List[int]]}
+                          sk = {'s': List[List[int]]}
         """
-        pk, sk = kyber_768.generate_keypair()
+        seed = os.urandom(32)
+        A = self._generate_matrix(seed)
+        s = self._sample_vector(self.eta1)
+        e = self._sample_vector(self.eta1)
+        As = self._matrix_vec_mul(A, s)
+        t = self._poly_vec_add(As, e)
+        pk = {'seed': seed, 't': t}
+        sk = {'s': s}
         return pk, sk
 
     def _encode_message(self, message: bytes) -> List[int]:
