@@ -1550,7 +1550,7 @@ The installer is called security_patch_v3.exe.
 This is your final warning — failure to install will lock your account.
 Your password will expire in 24 hours.
 
-Open the password-protected zip: patch_bundle.zip  (password: corp2026)
+Open the password-protected zip: patch_bundle.zip  (password: ********)
 """
 
 
