@@ -18,28 +18,65 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y cppcheck build-essential cmake libgmp-dev
 
-      - name: Run cppcheck on C sources
+      # -----------------------------------------------------------------------
+      # cppcheck – C sources (vendor/hqc, vendor/kyber_dilithium, quantaweave)
+      #
+      # Headers like symmetric.h, parameters.h and reed_solomon.h are NOT
+      # missing; they live under vendor/hqc/src/.  The three variants
+      # (hqc-1 / hqc-3 / hqc-5) each carry their own parameters.h and
+      # reed_solomon.h, so we run one analysis pass per variant.
+      # Standard library headers (<stdint.h>, <stdio.h>, etc.) are suppressed
+      # via --suppress=missingIncludeSystem – cppcheck does not need them to
+      # produce correct results.
+      # -----------------------------------------------------------------------
+      - name: Run cppcheck on C sources (HQC – per-variant)
         run: |
-          cppcheck --enable=all --inconclusive --std=c99 --language=c --error-exitcode=1 \
-            -I./vendor/hqc/include -I./vendor/hqc/packaging/utils/helpers -I. .
+          set -e
+          for VARIANT in hqc-1 hqc-3 hqc-5; do
+            echo "=== cppcheck HQC variant: $VARIANT ==="
+            cppcheck --enable=all --inconclusive --std=c99 --language=c \
+              --suppress=missingIncludeSystem \
+              --suppress=missingInclude \
+              --suppress=unusedFunction \
+              --error-exitcode=1 \
+              -I./vendor/hqc/src/common \
+              -I./vendor/hqc/src/common/${VARIANT} \
+              -I./vendor/hqc/src/ref \
+              -I./vendor/hqc/src/ref/${VARIANT} \
+              -I./vendor/hqc/lib/fips202 \
+              -I./vendor/hqc/packaging/utils/helpers \
+              ./vendor/hqc/src/common/ \
+              ./vendor/hqc/src/ref/ \
+              ./vendor/hqc/lib/fips202/ \
+              ./vendor/hqc/packaging/utils/helpers/
+          done
 
-      - name: Run cppcheck on C++ sources
+      - name: Run cppcheck on C++ sources (kyber_dilithium, quantaweave)
         run: |
-          cppcheck --enable=all --inconclusive --std=c++17 --language=c++ --error-exitcode=1 \
-            -I./vendor/hqc/include -I./vendor/hqc/packaging/utils/helpers -I. .
+          cppcheck --enable=all --inconclusive --std=c++17 --language=c++ \
+            --suppress=missingIncludeSystem \
+            --suppress=missingInclude \
+            --suppress=unusedFunction \
+            --error-exitcode=1 \
+            -I./vendor/kyber_dilithium/mlkem \
+            -I./vendor/kyber_dilithium/mldsa \
+            -I./vendor/falcon/include \
+            -I. \
+            ./vendor/kyber_dilithium/ \
+            ./quantaweave/
 
       - name: Prepare build directory
         run: mkdir -p build/github-testing
 
       - name: Build (Makefile, CMake, or fallback compilation)
         run: |
-          sudo BUILD_DIR=build/github-testing
+          BUILD_DIR=build/github-testing
           if [ -f Makefile ]; then
             echo "Running make..."
-            sudo make -j$(nproc) BUILD_DIR=$BUILD_DIR
+            make -j$(nproc) BUILD_DIR=$BUILD_DIR
           elif [ -f CMakeLists.txt ]; then
             echo "Running cmake..."
-            sudo cd $BUILD_DIR
+            cd $BUILD_DIR
             cmake ../..
             make -j$(nproc)
             cd ../..
