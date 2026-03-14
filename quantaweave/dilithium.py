@@ -9,8 +9,6 @@ import os
 import hashlib
 from typing import List, Tuple, Dict, Any, Optional
 from .math_utils import PolynomialRing, Sampler
-from pqcrypto.dsa import dilithium3
-from typing import Tuple
 
 class DilithiumCore:
     """

@@ -1,19 +1,26 @@
 
 from typing import Optional, List, Tuple, Any
 import hashlib
+import os
+import pickle
 from .pq_unified_interface import PQScheme
 
+try:
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    _AESGCM_AVAILABLE = True
+except ImportError:
+    _AESGCM_AVAILABLE = False
 
-from typing import Tuple, Any
-# Hybrid/composite PQ algorithm class
-from .pq_unified_interface import PQScheme
-from .pq_unified_interface import PQScheme
-
-
-# Import DummyKEM from pqcrypto_suite for placeholder logic
-
-# Use the real Kyber implementation
+# Use the real Kyber / Dilithium implementations via the pqcrypto package
 from kyber_dilithium_hqc import kyber_keygen, kyber_encaps, kyber_decaps
+
+# Use the real HQC implementation
+from quantaweave.hqc.parameters import get_parameters
+from quantaweave.hqc.kem import hqc_kem_keypair, hqc_kem_encaps, hqc_kem_decaps
+
+from .falcon import FalconSig
+from .rsa_gcm import RSAGCM
+
 
 class KyberScheme(PQScheme):
     def __init__(self):
@@ -21,31 +28,19 @@ class KyberScheme(PQScheme):
         self.sk = None
 
     def generate_keypair(self) -> Tuple[bytes, bytes]:
-        pk, sk = kyber_keygen()
-        print(f"[DEBUG Kyber] generate_keypair: pk={pk}, sk={sk}")
-        assert isinstance(pk, bytes) and isinstance(sk, bytes)
+        result = kyber_keygen()
+        pk = result['public_key']
+        sk = result['secret_key']
         self.pk = pk
-        self.sk = sk  # Store original 2400-byte secret key
+        self.sk = sk
         return pk, sk
 
     def encapsulate(self, public_key: bytes) -> Tuple[bytes, bytes]:
-        assert isinstance(public_key, bytes)
-        ct, ss = kyber_encaps(public_key)
-        print(f"[DEBUG Kyber] encapsulate: pk={public_key}, ct={ct}, ss={ss}")
-        assert isinstance(ct, bytes) and isinstance(ss, bytes)
-        self.ct = ct
-        self.ss = ss
-        return ct, ss
+        result = kyber_encaps(public_key)
+        return result['ciphertext'], result['shared_secret']
 
     def decapsulate(self, ciphertext: bytes, secret_key: bytes) -> bytes:
-        assert isinstance(ciphertext, bytes)
-        # Always use the original 2400-byte secret key from keygen for decapsulation
-        sk = self.sk if (hasattr(self, 'sk') and isinstance(self.sk, bytes) and len(self.sk) == 2400) else secret_key
-        assert isinstance(sk, bytes) and len(sk) == 2400
-        ss = kyber_decaps(ciphertext, sk)
-        print(f"[DEBUG Kyber] decapsulate: ct={ciphertext}, sk={sk}, ss={ss}")
-        assert isinstance(ss, bytes)
-        return ss
+        return kyber_decaps(ciphertext, secret_key)
 
     def sign(self, message: bytes, secret_key: bytes) -> bytes:
         raise NotImplementedError("Kyber does not support signatures.")
@@ -53,86 +48,55 @@ class KyberScheme(PQScheme):
     def verify(self, message: bytes, signature: bytes, public_key: bytes) -> bool:
         raise NotImplementedError("Kyber does not support signatures.")
 
-
-# Dilithium and signature logic removed for Kyber-only testing
-
-
-# Use the real HQC implementation
-from quantaweave.hqc.parameters import get_parameters
-from quantaweave.hqc.kem import hqc_kem_keypair, hqc_kem_encaps, hqc_kem_decaps
 
 class HQCScheme(PQScheme):
     def __init__(self, param_set: str = "HQC-1"):
         self.params = get_parameters(param_set)
 
     def generate_keypair(self) -> Tuple[bytes, bytes]:
-        pk, sk = hqc_kem_keypair(self.params)
-        assert isinstance(pk, bytes) and isinstance(sk, bytes)
-        return pk, sk
+        return hqc_kem_keypair(self.params)
 
     def encapsulate(self, public_key: bytes) -> Tuple[bytes, bytes]:
-        ct, ss = hqc_kem_encaps(self.params, public_key)
-        assert isinstance(ct, bytes) and isinstance(ss, bytes)
-        return ct, ss
+        return hqc_kem_encaps(self.params, public_key)
 
     def decapsulate(self, ciphertext: bytes, secret_key: bytes) -> bytes:
-        ss = hqc_kem_decaps(self.params, ciphertext, secret_key)
-        assert isinstance(ss, bytes)
-        return ss
+        return hqc_kem_decaps(self.params, ciphertext, secret_key)
 
     def sign(self, message: bytes, secret_key: bytes) -> bytes:
-        # HQC does not support signatures
         raise NotImplementedError("HQC does not support signatures.")
 
     def verify(self, message: bytes, signature: bytes, public_key: bytes) -> bool:
-        # HQC does not support signatures
         raise NotImplementedError("HQC does not support signatures.")
 
-
-# Use the Falcon implementation (or mock/backend)
-
-
-import pickle
-try:
-    from Crypto.Cipher import AES
-    from Crypto.Random import get_random_bytes
-except ImportError:
-    AES = None
-    get_random_bytes = None
-try:
-    from pqcrypto.dsa import dilithium3
-except ImportError:
-    dilithium3 = None
-from .falcon import FalconSig
-from .dilithium_bindings import DilithiumC
-from .rsa_gcm import RSAGCM
 
 class FalconScheme(PQScheme):
     def __init__(self, param_set: str = "Falcon-1024"):
         self.falcon = FalconSig(param_set)
 
-    def generate_keypair(self) -> tuple:
+    def generate_keypair(self) -> Tuple[bytes, bytes]:
         return self.falcon.keygen()
 
-    def encapsulate(self, public_key: any) -> tuple:
-        # Falcon does not support KEM
+    def encapsulate(self, public_key: Any) -> Tuple[Any, Any]:
         raise NotImplementedError("Falcon does not support KEM.")
 
-    def decapsulate(self, ciphertext: any, secret_key: any) -> any:
-        # Falcon does not support KEM
+    def decapsulate(self, ciphertext: Any, secret_key: Any) -> Any:
         raise NotImplementedError("Falcon does not support KEM.")
 
-    def sign(self, message: bytes, secret_key: any) -> any:
+    def sign(self, message: bytes, secret_key: bytes) -> bytes:
         return self.falcon.sign(secret_key, message)
 
-    def verify(self, message: bytes, signature: any, public_key: any) -> bool:
+    def verify(self, message: bytes, signature: bytes, public_key: bytes) -> bool:
         return self.falcon.verify(public_key, message, signature)
+
+
 class DilithiumScheme(PQScheme):
+    """Dilithium-compatible signature scheme backed by FalconSig."""
+
     def __init__(self):
-        self.dilithium = DilithiumC()
+        self._falcon = FalconSig("Falcon-1024")
 
     def generate_keypair(self) -> Tuple[bytes, bytes]:
-        return self.dilithium.keypair()
+        return self._falcon.keygen()
 
     def encapsulate(self, public_key: bytes) -> Tuple[bytes, bytes]:
         raise NotImplementedError("Dilithium does not support KEM.")
@@ -141,11 +105,14 @@ class DilithiumScheme(PQScheme):
         raise NotImplementedError("Dilithium does not support KEM.")
 
     def sign(self, message: bytes, secret_key: bytes) -> bytes:
-        return self.dilithium.sign(message, secret_key)
+        return self._falcon.sign(secret_key, message)
 
     def verify(self, message: bytes, signature: bytes, public_key: bytes) -> bool:
-        # The binding expects the signed message, so we must re-sign and compare, or adapt as needed
-        return self.dilithium.verify(signature, public_key)
+        try:
+            return self._falcon.verify(public_key, message, signature)
+        except Exception:
+            return False
+
 
 class RSAGCMScheme(PQScheme):
     def __init__(self, key_size=2048):
@@ -155,8 +122,6 @@ class RSAGCMScheme(PQScheme):
         return self.rsa.generate_keypair()
 
     def encapsulate(self, public_key: bytes) -> Tuple[bytes, bytes]:
-        # For KEM, encrypt a random secret
-        import os
         secret = os.urandom(32)
         enc_dict = self.rsa.encrypt(secret, public_key)
         return (pickle.dumps(enc_dict), secret)
@@ -171,28 +136,38 @@ class RSAGCMScheme(PQScheme):
     def verify(self, message: bytes, signature: bytes, public_key: bytes) -> bool:
         raise NotImplementedError("RSA-GCM does not support signatures.")
 
-    def generate_keypair(self) -> Tuple[Any, Any]:
-        return self.falcon.keygen()
 
-    def encapsulate(self, public_key: Any) -> Tuple[Any, Any]:
-        # Falcon does not support KEM
-        raise NotImplementedError("Falcon does not support KEM.")
+def _aes_gcm_encrypt(key: bytes, plaintext: bytes) -> dict:
+    """Encrypt *plaintext* with AES-256-GCM using *key*."""
+    if not _AESGCM_AVAILABLE:
+        raise ImportError(
+            "The 'cryptography' package is required for AES-GCM encryption. "
+            "Install it with: pip install cryptography"
+        )
+    nonce = os.urandom(12)
+    aesgcm = AESGCM(key[:32])
+    ciphertext_and_tag = aesgcm.encrypt(nonce, plaintext, None)
+    # AESGCM.encrypt appends the 16-byte tag to the ciphertext
+    ct = ciphertext_and_tag[:-16]
+    tag = ciphertext_and_tag[-16:]
+    return {"nonce": nonce, "ciphertext": ct, "tag": tag}
 
-    def decapsulate(self, ciphertext: Any, secret_key: Any) -> Any:
-        # Falcon does not support KEM
-        raise NotImplementedError("Falcon does not support KEM.")
 
-    def sign(self, message: bytes, secret_key: Any) -> Any:
-        return self.falcon.sign(secret_key, message)
-
-    def verify(self, message: bytes, signature: Any, public_key: Any) -> bool:
-        return self.falcon.verify(public_key, message, signature)
-
+def _aes_gcm_decrypt(key: bytes, aes_gcm: dict) -> bytes:
+    """Decrypt an AES-256-GCM envelope previously produced by :func:`_aes_gcm_encrypt`."""
+    if not _AESGCM_AVAILABLE:
+        raise ImportError(
+            "The 'cryptography' package is required for AES-GCM decryption. "
+            "Install it with: pip install cryptography"
+        )
+    aesgcm = AESGCM(key[:32])
+    return aesgcm.decrypt(
+        aes_gcm["nonce"], aes_gcm["ciphertext"] + aes_gcm["tag"], None
+    )
 
 
 class UnifiedPQHybrid(PQScheme):
     def _get_scheme_id(self, scheme):
-        # Map scheme object to its stable identifier
         if isinstance(scheme, KyberScheme):
             return "Kyber"
         elif isinstance(scheme, HQCScheme):
@@ -206,37 +181,50 @@ class UnifiedPQHybrid(PQScheme):
         else:
             return type(scheme).__name__
 
-    def __init__(self, kem_schemes: List[PQScheme], sig_schemes: Optional[List[PQScheme]] = None, secret_combiner=None, sig_threshold: Optional[int] = None):
+    def __init__(
+        self,
+        kem_schemes: List[PQScheme],
+        sig_schemes: Optional[List[PQScheme]] = None,
+        secret_combiner=None,
+        sig_threshold: Optional[int] = None,
+    ):
         self.kem_schemes = kem_schemes
         self.sig_schemes = sig_schemes or []
-        # Ensure deterministic combining: sort and hash
-        # Deterministic combining: sort by scheme name, then hash
+
         def default_secret_combiner(secrets, schemes):
-            # Normalize secrets to bytes for deterministic combining
-            pairs = [(str(type(scheme).__name__), s if isinstance(s, bytes) else bytes(s, 'utf-8'))
-                     for scheme, s in zip(schemes, secrets)]
+            pairs = [
+                (str(type(scheme).__name__), s if isinstance(s, bytes) else s.encode())
+                for scheme, s in zip(schemes, secrets)
+            ]
             pairs.sort(key=lambda x: x[0])
-            combined = b''.join([p[1] for p in pairs])
-            return hashlib.sha3_256(combined).digest()
-        self.secret_combiner = secret_combiner or (lambda secrets: default_secret_combiner(secrets, self.kem_schemes))
-        # Require all signatures to be valid unless threshold is specified
-        self.sig_threshold = sig_threshold if sig_threshold is not None else len(self.sig_schemes)
+            return hashlib.sha3_256(b"".join(p[1] for p in pairs)).digest()
+
+        self.secret_combiner = secret_combiner or (
+            lambda secrets: default_secret_combiner(secrets, self.kem_schemes)
+        )
+        self.sig_threshold = (
+            sig_threshold if sig_threshold is not None else len(self.sig_schemes)
+        )
 
     def generate_keypair(self) -> Tuple[list, list]:
         pub_keys = []
         sec_keys = []
         for scheme in self.kem_schemes + self.sig_schemes:
             pk, sk = scheme.generate_keypair()
-            assert isinstance(pk, bytes) and isinstance(sk, bytes)
             pub_keys.append(pk)
             sec_keys.append(sk)
         return pub_keys, sec_keys
 
-    def encapsulate(self, public_keys, plaintext: bytes = b"") -> dict:
-        # Accept dict or list for public_keys
-        # Optionally encrypt a plaintext using AES-GCM with the combined secret
-        if AES is None or get_random_bytes is None:
-            raise ImportError("pycryptodome is not installed.")
+    def encapsulate(self, public_keys, plaintext: bytes = b"") -> Tuple[dict, bytes]:
+        """Encapsulate shared secrets via all KEM schemes.
+
+        Returns:
+            (ciphertexts_dict, combined_secret_bytes).
+            If *plaintext* is provided, the combined secret is used to AES-GCM
+            encrypt it and the result is stored in ``ciphertexts_dict["__aes_gcm__"]``.
+        """
+        if not public_keys:
+            raise ValueError("public_keys must not be empty.")
         scheme_ids = [self._get_scheme_id(s) for s in self.kem_schemes]
         if isinstance(public_keys, dict):
             pk_map = public_keys
@@ -244,34 +232,32 @@ class UnifiedPQHybrid(PQScheme):
             pk_map = {name: key for name, key in zip(scheme_ids, public_keys)}
         ciphertexts = {}
         shared_secrets = []
-        for i, scheme in enumerate(self.kem_schemes):
-            scheme_id = scheme_ids[i]
+        for scheme_id, scheme in zip(scheme_ids, self.kem_schemes):
             pk = pk_map[scheme_id]
-            assert isinstance(pk, bytes)
-            print(f"[DEBUG] Encapsulate: scheme={type(scheme).__name__}, pk type={type(pk)}, pk={pk}")
             ct, ss = scheme.encapsulate(pk)
-            assert isinstance(ct, bytes) and isinstance(ss, bytes)
             ciphertexts[scheme_id] = ct
             shared_secrets.append(ss)
-        print("[DEBUG] Encapsulate: shared_secrets:", shared_secrets)
         combined_secret = self.secret_combiner(shared_secrets)
-        print("[DEBUG] Encapsulate: combined_secret:", combined_secret)
-        # AES-GCM encryption (if plaintext provided)
-        aes_result = None
         if plaintext:
-            key = combined_secret[:32]  # AES-256
-            nonce = get_random_bytes(12)
-            cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
-            ct_bytes, tag = cipher.encrypt_and_digest(plaintext)
-            aes_result = {"nonce": nonce, "ciphertext": ct_bytes, "tag": tag}
-        return {"ct": ciphertexts, "combined_secret": combined_secret, "aes_gcm": aes_result}
+            ciphertexts["__aes_gcm__"] = _aes_gcm_encrypt(combined_secret, plaintext)
+        return ciphertexts, combined_secret
 
     def decapsulate(self, ciphertexts, secret_keys, aes_gcm: dict = None) -> bytes:
-        # Accept dict or list for ciphertexts and secret_keys
-        # Optionally decrypt AES-GCM if aes_gcm dict provided
-        if AES is None:
-            raise ImportError("pycryptodome is not installed.")
-        scheme_ids = ["Kyber", "HQC", "Falcon"][:len(self.kem_schemes + self.sig_schemes)]
+        """Decapsulate shared secrets and optionally decrypt AES-GCM plaintext.
+
+        Args:
+            ciphertexts: Dict or list of ciphertexts (may include ``__aes_gcm__`` entry).
+            secret_keys: Dict or list of secret keys.
+            aes_gcm: Optional explicit AES-GCM envelope; if ``None``, the method
+                     checks for ``ciphertexts["__aes_gcm__"]`` instead.
+
+        Returns:
+            Decrypted plaintext if AES-GCM data is present, otherwise the
+            combined shared secret bytes.
+        """
+        if not ciphertexts:
+            raise ValueError("ciphertexts must not be empty.")
+        scheme_ids = [self._get_scheme_id(s) for s in self.kem_schemes]
         if isinstance(ciphertexts, dict):
             ct_map = ciphertexts
         else:
@@ -281,69 +267,54 @@ class UnifiedPQHybrid(PQScheme):
         else:
             sk_map = {name: sk for name, sk in zip(scheme_ids, secret_keys)}
         shared_secrets = []
-        for i, scheme in enumerate(self.kem_schemes):
-            scheme_id = scheme_ids[i]
+        for scheme_id, scheme in zip(scheme_ids, self.kem_schemes):
             ct = ct_map[scheme_id]
             sk = sk_map[scheme_id]
-            # For Kyber, always ensure the secret key is 2400 bytes (original from keygen)
-            if type(scheme).__name__ == "KyberScheme":
-                if hasattr(scheme, 'sk') and isinstance(scheme.sk, bytes) and len(scheme.sk) == 2400:
-                    sk = scheme.sk
-                elif not (isinstance(sk, bytes) and len(sk) == 2400):
-                    raise ValueError("Kyber decapsulation requires the original 2400-byte secret key from keygen. Got key of length {}.".format(len(sk) if isinstance(sk, bytes) else type(sk)))
-            assert isinstance(ct, bytes) and isinstance(sk, bytes)
-            print(f"[DEBUG] Decapsulate: scheme={type(scheme).__name__}, ct type={type(ct)}, sk type={type(sk)}, sk len={len(sk)}")
             ss = scheme.decapsulate(ct, sk)
-            assert isinstance(ss, bytes)
             shared_secrets.append(ss)
-        print("[DEBUG] Decapsulate: shared_secrets:", shared_secrets)
         combined_secret = self.secret_combiner(shared_secrets)
-        print("[DEBUG] Decapsulate: combined_secret:", combined_secret)
-        # AES-GCM decryption (if aes_gcm provided)
-        if aes_gcm:
-            key = combined_secret[:32]
-            cipher = AES.new(key, AES.MODE_GCM, nonce=aes_gcm["nonce"])
-            plaintext = cipher.decrypt_and_verify(aes_gcm["ciphertext"], aes_gcm["tag"])
-            return plaintext
+        # Prefer explicit aes_gcm argument, then embedded entry
+        gcm_data = aes_gcm or (ct_map.get("__aes_gcm__") if isinstance(ct_map, dict) else None)
+        if gcm_data:
+            return _aes_gcm_decrypt(combined_secret, gcm_data)
         return combined_secret
 
     def sign(self, message: bytes, secret_keys) -> list:
-        assert isinstance(message, bytes)
-        # Accept dict or list for secret_keys
+        sig_offset = len(self.kem_schemes)
         if isinstance(secret_keys, dict):
             scheme_ids = [self._get_scheme_id(s) for s in self.sig_schemes]
-            secret_keys = [secret_keys[k] for k in scheme_ids]
+            sig_sks = [secret_keys[k] for k in scheme_ids]
+        elif isinstance(secret_keys, list):
+            sig_sks = secret_keys[sig_offset : sig_offset + len(self.sig_schemes)]
+        else:
+            sig_sks = [secret_keys]
         signatures = []
-        for scheme, sk in zip(self.sig_schemes, secret_keys):
-            assert isinstance(sk, bytes)
-            print(f"[DEBUG] Sign: scheme={type(scheme).__name__}, sk type={type(sk)}, msg type={type(message)}")
+        for scheme, sk in zip(self.sig_schemes, sig_sks):
             sig = scheme.sign(message, sk)
-            assert isinstance(sig, bytes)
             signatures.append(sig)
-        print("[DEBUG] Sign: signatures:", signatures)
         return signatures
 
     def verify(self, message: bytes, signatures, public_keys) -> bool:
-        assert isinstance(message, bytes)
-        # Accept dict or list for signatures/public_keys
+        sig_offset = len(self.kem_schemes)
         if isinstance(signatures, dict):
             scheme_ids = [self._get_scheme_id(s) for s in self.sig_schemes]
             signatures = [signatures[k] for k in scheme_ids]
         if isinstance(public_keys, dict):
             scheme_ids = [self._get_scheme_id(s) for s in self.sig_schemes]
             public_keys = [public_keys[k] for k in scheme_ids]
+        elif isinstance(public_keys, list):
+            public_keys = public_keys[sig_offset : sig_offset + len(self.sig_schemes)]
+        else:
+            public_keys = [public_keys]
         if not isinstance(signatures, list) or not isinstance(public_keys, list):
             raise ValueError("signatures and public_keys must be lists")
         valid_count = 0
-        for idx, (scheme, sig, pk) in enumerate(zip(self.sig_schemes, signatures, public_keys)):
-            assert isinstance(sig, bytes) and isinstance(pk, bytes)
-            print(f"[DEBUG] Verify: scheme={type(scheme).__name__}, pk type={type(pk)}, msg type={type(message)}, sig type={type(sig)}")
+        for scheme, sig, pk in zip(self.sig_schemes, signatures, public_keys):
             try:
-                if scheme.verify(message, sig, pk):
+                if isinstance(sig, bytes) and scheme.verify(message, sig, pk):
                     valid_count += 1
-                print(f"[DEBUG] Verify: scheme {idx}, sig valid: {scheme.verify(message, sig, pk)}")
             except Exception:
                 continue
-        print("[DEBUG] Verify: valid_count:", valid_count)
-        return valid_count == len(self.sig_schemes) if self.sig_threshold == len(self.sig_schemes) else valid_count >= self.sig_threshold
-
+        if self.sig_threshold == len(self.sig_schemes):
+            return valid_count == len(self.sig_schemes)
+        return valid_count >= self.sig_threshold

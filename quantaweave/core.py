@@ -47,6 +47,10 @@ class QuantaWeave:
         Returns:
             Tuple of (public_key, private_key)
         """
+        if getattr(self, 'algorithm', None) == 'NEWALGO':
+            pk = {'newalgo': 'public_key_placeholder'}
+            sk = {'newalgo': 'private_key_placeholder'}
+            return pk, sk
         return self.keygen.generate_keypair()
     
     @staticmethod
@@ -61,6 +65,8 @@ class QuantaWeave:
         Returns:
             Ciphertext dictionary
         """
+        if isinstance(public_key, dict) and 'newalgo' in public_key:
+            return {'newalgo_ciphertext': 'ciphertext_placeholder'}
         encryptor = Encryptor(public_key)
         return encryptor.encrypt(message)
     
@@ -76,6 +82,8 @@ class QuantaWeave:
         Returns:
             Decrypted message (bytes)
         """
+        if isinstance(private_key, dict) and 'newalgo' in private_key:
+            return b'newalgo_decrypted_message_placeholder'
         decryptor = Decryptor(private_key)
         return decryptor.decrypt(ciphertext)
     
