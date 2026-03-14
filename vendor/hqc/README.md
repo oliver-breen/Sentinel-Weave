@@ -26,6 +26,7 @@
   + **ref/** – files generated with the reference build
   + **x86_64/avx256** – files generated with the optimized build
 + **packaging/** – scripts and Doxygen docs for packaging and documentation
+  + **utils/helpers/** – standalone C helpers: `main_kat.c` (KAT vector generator) and `main_hqc.c` (interactive KEM demo)
 + **CHANGELOG** – project changelog
 + **CMakeLists.txt** – top-level CMake build script (sub-directories have their own)
 + **LICENSE** – project license
