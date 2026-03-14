@@ -1,4 +1,6 @@
 ruff==0.6.8
 mypy==1.11.2
+pytest>=8.0
 
 cryptography>=41.0.0
+flask>=3.0

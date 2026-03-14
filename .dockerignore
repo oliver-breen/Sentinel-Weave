@@ -1,0 +1,81 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# .dockerignore — keep the Docker build context small and fast
+#
+# Only the files needed at runtime (sentinel_weave/, dashboard/, quantaweave/,
+# requirements.txt) are included.  Everything else is excluded.
+# ──────────────────────────────────────────────────────────────────────────────
+
+# Version control
+.git
+.github
+
+# Python byte-code and caches
+__pycache__
+*.py[cod]
+*$py.class
+*.pyo
+.mypy_cache
+.ruff_cache
+.pytest_cache
+.coverage
+htmlcov
+
+# Virtual environments / local installs
+venv
+env
+ENV
+.venv
+*.egg-info
+dist
+build
+
+# C/C++ vendor sources and build artefacts (not needed at runtime)
+vendor
+gmp-6.3.0
+gmp_include
+gmp_libs
+*.so
+*.dll
+*.lib
+
+# Large directories not needed in the image
+"Necessary Files"
+"New-Algorithm-for-Post-Quantum-Cryptography"
+
+# Tests and dev tooling
+tests
+scripts
+
+# IDE / OS artefacts
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Spec files and installers (only needed for Windows packaging)
+*.spec
+installers
+
+# Docs that don't affect runtime
+docs
+assets
+examples
+
+# Miscellaneous files that should not be baked into the image
+*.diff
+*.md
+*.log
+*.tmp
+.tmp
+results_v2.md
+full_patch.diff
+move_file.py
+mypy.ini
+ruff.toml
+pyproject.toml
+setup.py
+MANIFEST.in
+requirements-dev.txt
