@@ -1,0 +1,136 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Default values for the sentinel-weave Helm chart.
+# Override any of these values in a separate values file or with --set.
+#
+# Example — AKS deployment with Azure-backed features enabled:
+#   helm upgrade --install sentinel-weave ./helm/sentinel-weave \
+#     --set azure.storageConnectionString="DefaultEndpointsProtocol=https;..." \
+#     --set ingress.enabled=true \
+#     --set ingress.hosts[0].host=sentinel.example.com
+# ──────────────────────────────────────────────────────────────────────────────
+
+# -- Image ------------------------------------------------------------------
+image:
+  repository: sentinelweave
+  tag: "0.4.0"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# -- Replica / scaling -------------------------------------------------------
+replicaCount: 1
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# -- Service -----------------------------------------------------------------
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 5000
+  # Set to LoadBalancer or NodePort for external access without an Ingress.
+  # On AKS, LoadBalancer provisions an Azure Load Balancer automatically.
+
+# -- Ingress -----------------------------------------------------------------
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: sentinel-weave.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  # - secretName: sentinel-weave-tls
+  #   hosts:
+  #     - sentinel-weave.local
+
+# -- Resources ---------------------------------------------------------------
+resources:
+  requests:
+    cpu: 250m
+    memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+# -- Probes ------------------------------------------------------------------
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 5000
+  initialDelaySeconds: 20
+  periodSeconds: 30
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 5000
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# -- Service Account ---------------------------------------------------------
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# -- Pod settings ------------------------------------------------------------
+podAnnotations: {}
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# -- Environment variables passed to the container --------------------------
+env:
+  # Dashboard demo mode — set to "false" in production.
+  SENTINELWEAVE_DEMO_MODE: "true"
+
+# -- Azure integration (all optional) ---------------------------------------
+azure:
+  storageConnectionString: ""
+  textAnalyticsEndpoint: ""
+  textAnalyticsKey: ""
+  appInsightsConnectionString: ""
+  mlEndpoint: ""
+  mlApiKey: ""
+
+# -- Existing secret name for Azure credentials (alternative to above) ------
+# When set, the chart reads Azure credentials from this pre-created secret
+# instead of constructing one from the values above.
+existingSecret: ""
+
+# -- Persistence (optional) -------------------------------------------------
+persistence:
+  enabled: false
+  storageClass: ""       # "" → cluster default (e.g. managed-premium on AKS)
+  accessMode: ReadWriteOnce
+  size: 1Gi
+  mountPath: /data
+
+# -- Name override -----------------------------------------------------------
+nameOverride: ""
+fullnameOverride: ""

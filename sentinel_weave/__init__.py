@@ -32,6 +32,10 @@ Combines:
     - ML-based anomaly detection on scan data (scikit-learn + pandas)
     - Binary security-mitigation auditing & ROP gadget discovery (pwntools)
     - Memory forensics: process/network/injection analysis (Volatility 3)
+* Threat hunting query engine:
+    - ThreatQueryEngine: SQL-inspired query language for stored ThreatReports
+* Federated threat intelligence:
+    - FederatedIntelHub: peer-to-peer sharing of encrypted threat summaries
 * Dependency-integrated improvements to core modules:
     - YaraEventAnalyzer: YARA-augmented log-line signature detection
     - detect_shellcode(): Capstone-based shellcode analysis in event_analyzer
@@ -96,6 +100,8 @@ from .advanced_offensive import (
     # Memory forensics (Volatility 3)
     MemoryForensicsScanner, ProcessEntry, NetworkEntry, ForensicsReport,
 )
+from .threat_query import ThreatQueryEngine
+from .federated_intel import FederatedIntelHub, ThreatIntelSummary, PeerNode
 
 __all__ = [
     # Event parsing
@@ -198,4 +204,10 @@ __all__ = [
     "ProcessEntry",
     "NetworkEntry",
     "ForensicsReport",
+    # Threat hunting query engine
+    "ThreatQueryEngine",
+    # Federated threat intelligence
+    "FederatedIntelHub",
+    "ThreatIntelSummary",
+    "PeerNode",
 ]

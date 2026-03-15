@@ -68,6 +68,8 @@ from sentinel_weave.advanced_offensive import (
     YaraScanner,
     AnomalyDetector,
 )
+from sentinel_weave.threat_query import ThreatQueryEngine
+from sentinel_weave.federated_intel import FederatedIntelHub
 
 # ---------------------------------------------------------------------------
 # In-memory metrics store
@@ -320,6 +322,8 @@ def create_app(demo_mode: bool = True) -> Flask:
     shellcode_analyzer = ShellcodeAnalyzer(arch="x86_64")
     yara_scanner       = YaraScanner()
     anomaly_detector   = AnomalyDetector()
+    query_engine       = ThreatQueryEngine()
+    fed_hub            = FederatedIntelHub()
 
     if demo_mode:
         _start_demo_simulator(store)
@@ -721,6 +725,162 @@ def create_app(demo_mode: bool = True) -> Flask:
                 }
                 for r in report.records
             ],
+        }), 200
+
+    # ------------------------------------------------------------------
+    # Threat hunting query endpoint
+    # ------------------------------------------------------------------
+
+    @app.post("/api/query")
+    def api_query() -> Response:
+        """
+        Search stored threat reports with a query expression.
+
+        Request JSON fields:
+          ``q`` (str, required) — query expression, e.g.
+            ``"threat_level = HIGH AND source_ip = 10.*"``
+
+        Returns a list of matching event summaries.
+        """
+        payload = request.get_json(force=True, silent=True) or {}
+        q = payload.get("q", "")
+        if not isinstance(q, str):
+            return jsonify({"error": "field 'q' must be a string"}), 400
+
+        # Sync query engine with current store contents
+        with store._lock:
+            all_reports = list(store._reports)
+        query_engine.clear()
+        query_engine.add_bulk(all_reports)
+
+        try:
+            results = query_engine.query(q)
+        except (ValueError, IndexError) as exc:
+            return jsonify({"error": f"Query parse error: {exc}"}), 400
+
+        return jsonify({
+            "query":   q,
+            "count":   len(results),
+            "results": [
+                {
+                    "ts":          r.event.timestamp.isoformat() if r.event.timestamp else None,
+                    "source_ip":   r.event.source_ip,
+                    "event_type":  r.event.event_type,
+                    "threat_level": r.threat_level.value,
+                    "anomaly_score": round(r.anomaly_score, 4),
+                    "signatures":   r.event.matched_sigs,
+                    "summary":      r.summary(),
+                }
+                for r in results
+            ],
+        }), 200
+
+    # ------------------------------------------------------------------
+    # Federated threat intelligence endpoints
+    # ------------------------------------------------------------------
+
+    @app.post("/api/federated/peers")
+    def api_federated_register_peer() -> Response:
+        """
+        Register a peer node for federated threat-intel exchange.
+
+        Request JSON fields:
+          ``peer_id``   (str, required)  — unique identifier of the peer.
+          ``shared_key_hex`` (str, required) — 64-char hex-encoded 32-byte key.
+          ``host``      (str, optional)  — peer's hostname for HTTP push.
+          ``port``      (int, optional)  — peer's HTTP port (default 5000).
+        """
+        payload = request.get_json(force=True, silent=True) or {}
+        peer_id = payload.get("peer_id")
+        key_hex = payload.get("shared_key_hex")
+        if not peer_id or not key_hex:
+            return jsonify({"error": "peer_id and shared_key_hex are required"}), 400
+        try:
+            key = bytes.fromhex(key_hex)
+        except ValueError:
+            return jsonify({"error": "shared_key_hex must be a valid hex string"}), 400
+        try:
+            fed_hub.register_peer(
+                peer_id,
+                key,
+                host=payload.get("host"),
+                port=int(payload.get("port", 5000)),
+            )
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        return jsonify({"registered": peer_id}), 201
+
+    @app.post("/api/federated/share")
+    def api_federated_share() -> Response:
+        """
+        Create an encrypted summary of stored reports and return it as JSON.
+
+        Request JSON fields:
+          ``peer_id`` (str, required) — registered peer to encrypt for.
+          ``metadata`` (dict, optional) — extra key/value pairs to include.
+
+        Returns the encrypted bundle bytes as a hex string.  Push it to the
+        peer's ``POST /api/federated/receive`` endpoint.
+        """
+        payload = request.get_json(force=True, silent=True) or {}
+        peer_id = payload.get("peer_id")
+        if not peer_id:
+            return jsonify({"error": "peer_id is required"}), 400
+
+        with store._lock:
+            all_reports = list(store._reports)
+
+        try:
+            bundle = fed_hub.create_summary(
+                all_reports,
+                peer_id=peer_id,
+                metadata=payload.get("metadata"),
+            )
+        except KeyError as exc:
+            return jsonify({"error": str(exc)}), 404
+        except Exception as exc:
+            return jsonify({"error": str(exc)}), 500
+
+        return jsonify({
+            "sender_node_id": fed_hub.node_id,
+            "peer_id":        peer_id,
+            "report_count":   len(all_reports),
+            "bundle_hex":     bundle.hex(),
+        }), 200
+
+    @app.post("/api/federated/receive")
+    def api_federated_receive() -> Response:
+        """
+        Accept an encrypted threat-intel bundle from a peer and store it.
+
+        Request body: raw JSON bundle bytes (as returned by a remote
+        ``POST /api/federated/share`` or :meth:`FederatedIntelHub.create_summary`).
+        """
+        bundle_bytes = request.get_data()
+        if not bundle_bytes:
+            return jsonify({"error": "empty request body"}), 400
+        try:
+            summary = fed_hub.receive_bundle(bundle_bytes)
+        except KeyError as exc:
+            return jsonify({"error": str(exc)}), 403
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        except Exception as exc:
+            return jsonify({"error": str(exc)}), 500
+
+        return jsonify({
+            "received_from":  summary.sender_id,
+            "total_events":   summary.total_events,
+            "max_anomaly":    summary.max_anomaly,
+            "threat_counts":  summary.threat_counts,
+        }), 201
+
+    @app.get("/api/federated/summaries")
+    def api_federated_summaries() -> Response:
+        """Return all received federated threat-intel summaries."""
+        return jsonify({
+            "summaries": [s.to_dict() for s in fed_hub.list_summaries()],
+            "stats":     fed_hub.summary_stats(),
         }), 200
 
     return app
