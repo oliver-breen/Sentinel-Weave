@@ -4,7 +4,7 @@ from quantaweave.woven_algorithm import QuantaWeaveAlgorithm
 
 class TestQuantaWeaveAlgorithm(unittest.TestCase):
     """
-    Test suite for the Woven Algorithm (Kyber + HQC + Dilithium).
+    Test suite for the Woven Algorithm (LWE-KEM + HQC + Falcon).
     """
 
     def setUp(self):
@@ -29,7 +29,7 @@ class TestQuantaWeaveAlgorithm(unittest.TestCase):
         self.assertGreater(len(sk), 0)
 
     def test_encapsulation_decapsulation(self):
-        """Test hybrid KEM functionality (Kyber + HQC)."""
+        """Test hybrid KEM functionality (LWE-KEM + HQC)."""
         pk, sk = self.algo.generate_keypair()
         ct, ss = self.algo.encapsulate(pk)
         self.assertIsInstance(ct, dict)
@@ -43,7 +43,7 @@ class TestQuantaWeaveAlgorithm(unittest.TestCase):
         self.assertEqual(ss['combined_secret'], ss_recovered['combined_secret'])
 
     def test_signature(self):
-        """Test hybrid signature functionality (Dilithium)."""
+        """Test hybrid signature functionality (Falcon)."""
         pk, sk = self.algo.generate_keypair()
         message = b"Test message for woven signature"
         sig = self.algo.sign(message, sk)

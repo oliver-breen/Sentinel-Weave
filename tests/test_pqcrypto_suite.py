@@ -4,13 +4,13 @@ from pqcrypto.pqcrypto_suite import PQCryptoSuite
 
 class TestPQCryptoSuite(unittest.TestCase):
     def test_kem_keypair_returns_bytes(self):
-        suite = PQCryptoSuite(kem='kyber', sig='dilithium', level='LEVEL1')
+        suite = PQCryptoSuite(kem='lwe', sig='falcon', level='LEVEL1')
         pk, sk = suite.kem_keypair()
         self.assertIsInstance(pk, bytes)
         self.assertIsInstance(sk, bytes)
 
     def test_kem_encapsulate_and_decapsulate(self):
-        suite = PQCryptoSuite(kem='kyber', sig='dilithium', level='LEVEL1')
+        suite = PQCryptoSuite(kem='lwe', sig='falcon', level='LEVEL1')
         pk, sk = suite.kem_keypair()
         ct, ss = suite.kem_encapsulate(pk)
         self.assertIsInstance(ct, bytes)
@@ -19,7 +19,7 @@ class TestPQCryptoSuite(unittest.TestCase):
         self.assertEqual(ss, recovered)
 
     def test_sig_keypair_and_sign_verify(self):
-        suite = PQCryptoSuite(kem='kyber', sig='falcon', level='LEVEL1')
+        suite = PQCryptoSuite(kem='lwe', sig='falcon', level='LEVEL1')
         pk, sk = suite.sig_keypair()
         self.assertIsInstance(pk, bytes)
         self.assertIsInstance(sk, bytes)
@@ -30,7 +30,7 @@ class TestPQCryptoSuite(unittest.TestCase):
         self.assertFalse(suite.verify(pk, msg, b"invalid_signature"))
 
     def test_verify_rejects_non_bytes_signature(self):
-        suite = PQCryptoSuite(kem='kyber', sig='dilithium', level='LEVEL1')
+        suite = PQCryptoSuite(kem='lwe', sig='falcon', level='LEVEL1')
         pk, sk = suite.sig_keypair()
         self.assertFalse(suite.verify(pk, b"msg", "not_bytes"))
 
@@ -40,7 +40,7 @@ class TestPQCryptoSuite(unittest.TestCase):
             suite.kem_keypair()
 
     def test_unsupported_sig_raises(self):
-        suite = PQCryptoSuite(kem='kyber', sig='unknown', level='LEVEL1')
+        suite = PQCryptoSuite(kem='lwe', sig='unknown', level='LEVEL1')
         with self.assertRaises(ValueError):
             suite.sig_keypair()
 

@@ -2,61 +2,57 @@ from typing import Optional, List, Tuple, Any
 import hashlib
 from .pq_unified_interface import PQScheme
 
-# Use the real Kyber implementation
-from kyber_dilithium_hqc import kyber_keygen, kyber_encaps, kyber_decaps
+# Use the LWE KEM implementation
+from kyber_dilithium_hqc import kem_keygen, kem_encaps, kem_decaps
 
-class KyberScheme(PQScheme):
+class LWEKEMScheme(PQScheme):
     def __init__(self):
         pass
 
     def generate_keypair(self) -> Tuple[Any, Any]:
-        return kyber_keygen()
+        return kem_keygen()
 
     def encapsulate(self, public_key: Any) -> Tuple[Any, Any]:
         if isinstance(public_key, str):
             public_key = public_key.encode()
-        return kyber_encaps(public_key)
+        return kem_encaps(public_key)
 
     def decapsulate(self, ciphertext: Any, secret_key: Any) -> Any:
         if isinstance(ciphertext, str):
             ciphertext = ciphertext.encode()
         if isinstance(secret_key, str):
             secret_key = secret_key.encode()
-        return kyber_decaps(ciphertext, secret_key)
+        return kem_decaps(ciphertext, secret_key)
 
     def sign(self, message: bytes, secret_key: Any) -> Any:
-        # Kyber does not support signatures
-        raise NotImplementedError("Kyber does not support signatures.")
+        raise NotImplementedError("LWE KEM does not support signatures.")
 
     def verify(self, message: bytes, signature: Any, public_key: Any) -> bool:
-        # Kyber does not support signatures
-        raise NotImplementedError("Kyber does not support signatures.")
+        raise NotImplementedError("LWE KEM does not support signatures.")
 
 
-# Use the real Dilithium implementation
-from kyber_dilithium_hqc import dilithium_keygen, dilithium_sign, dilithium_verify
+# Use the Falcon signature implementation
+from kyber_dilithium_hqc import sig_keygen, sig_sign, sig_verify
 
-class DilithiumScheme(PQScheme):
+class FalconSignatureScheme(PQScheme):
     def __init__(self):
         pass
 
     def generate_keypair(self) -> Tuple[Any, Any]:
-        return dilithium_keygen()
+        return sig_keygen()
 
     def encapsulate(self, public_key: Any) -> Tuple[Any, Any]:
-        # Dilithium does not support KEM
-        raise NotImplementedError("Dilithium does not support KEM.")
+        raise NotImplementedError("Falcon does not support KEM.")
 
     def decapsulate(self, ciphertext: Any, secret_key: Any) -> Any:
-        # Dilithium does not support KEM
-        raise NotImplementedError("Dilithium does not support KEM.")
+        raise NotImplementedError("Falcon does not support KEM.")
 
     def sign(self, message: bytes, secret_key: Any) -> Any:
         if isinstance(secret_key, str):
             secret_key = secret_key.encode()
         if isinstance(message, str):
             message = message.encode()
-        return dilithium_sign(secret_key, message)
+        return sig_sign(secret_key, message)
 
     def verify(self, message: bytes, signature: Any, public_key: Any) -> bool:
         if isinstance(public_key, str):
@@ -65,7 +61,7 @@ class DilithiumScheme(PQScheme):
             message = message.encode()
         if isinstance(signature, str):
             signature = signature.encode()
-        return dilithium_verify(public_key, message, signature)
+        return sig_verify(public_key, message, signature)
 
 
 # Use the real HQC implementation

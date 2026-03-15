@@ -1,13 +1,13 @@
-from quantaweave.pq_schemes import KyberScheme, DilithiumScheme, HQCScheme, UnifiedPQHybrid
+from quantaweave.pq_schemes import LWEKEMScheme, FalconSignatureScheme, HQCScheme, UnifiedPQHybrid
 
 def main():
     # Instantiate individual schemes
-    kyber = KyberScheme()
+    lwe = LWEKEMScheme()
     hqc = HQCScheme(param_set="HQC-1")
-    dilithium = DilithiumScheme()
+    falcon_sig = FalconSignatureScheme()
 
-    # Create a hybrid: Kyber + HQC for KEM, Dilithium for signature
-    hybrid = UnifiedPQHybrid(kem_schemes=[kyber, hqc], sig_schemes=[dilithium])
+    # Create a hybrid: LWE KEM + HQC for KEM, Falcon for signature
+    hybrid = UnifiedPQHybrid(kem_schemes=[lwe, hqc], sig_schemes=[falcon_sig])
 
     # Key generation
     pub_keys, sec_keys = hybrid.generate_keypair()

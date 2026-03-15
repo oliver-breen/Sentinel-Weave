@@ -11,15 +11,15 @@ Usage (real Azure)::
 
     from quantaweave.azure_keyvault import PQCKeyVaultClient
     client = PQCKeyVaultClient(vault_url="https://<vault>.vault.azure.net/")
-    client.store_key("my-kyber-pk", public_key_bytes)
-    retrieved = client.retrieve_key("my-kyber-pk")
+    client.store_key("my-lwe-pk", public_key_bytes)
+    retrieved = client.retrieve_key("my-lwe-pk")
 
 Usage (mock / testing)::
 
     from quantaweave.azure_keyvault import MockKeyVaultClient
     client = MockKeyVaultClient()
-    client.store_key("my-kyber-pk", public_key_bytes)
-    retrieved = client.retrieve_key("my-kyber-pk")
+    client.store_key("my-lwe-pk", public_key_bytes)
+    retrieved = client.retrieve_key("my-lwe-pk")
 """
 
 import base64

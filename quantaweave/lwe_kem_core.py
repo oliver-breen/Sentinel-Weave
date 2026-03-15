@@ -1,8 +1,11 @@
 """
-Pure Python implementation of Kyber (ML-KEM) for educational purposes.
+Pure Python LWE-based KEM implementation for educational purposes.
 
-This implementation follows the Kyber specification but uses naive polynomial multiplication
-instead of NTT for simplicity. It is compatible with the parameters of Kyber-768.
+This is an educational reference implementation using LWE (Learning With Errors)
+polynomial arithmetic, using LWE parameters.
+
+This implementation uses naive polynomial multiplication
+instead of NTT for simplicity. Parameters are based on the LWE problem.
 """
 
 import os
@@ -10,19 +13,19 @@ import hashlib
 from typing import List, Tuple, Dict, Any
 from .math_utils import PolynomialRing, Sampler, compress, decompress
 
-class KyberCore:
+class LWEKEMCore:
     """
-    Core implementation of Kyber KEM (Kyber-768 parameters by default).
+    Core implementation of an LWE-based KEM (LWE KEM parameters by default).
     """
     
     def __init__(self, k=3, eta1=2, eta2=2, du=10, dv=4):
         self.n = 256
         self.q = 3329
-        self.k = k           # k=3 for Kyber-768
-        self.eta1 = eta1     # eta1=2 for Kyber-768 (Wait, spec says eta1=2 for 768?)
-                             # Kyber-512: k=2, eta1=3, eta2=2, du=10, dv=4
-                             # Kyber-768: k=3, eta1=2, eta2=2, du=10, dv=4
-                             # Kyber-1024: k=4, eta1=2, eta2=2, du=11, dv=5
+        self.k = k           # k=3 (768-level)
+        self.eta1 = eta1     # eta1=2 (768-level)
+                             # Small (512-level): k=2, eta1=3, eta2=2, du=10, dv=4
+                             # Medium (768-level): k=3, eta1=2, eta2=2, du=10, dv=4
+                             # Large (1024-level): k=4, eta1=2, eta2=2, du=11, dv=5
         self.eta2 = eta2
         self.du = du
         self.dv = dv
@@ -34,7 +37,7 @@ class KyberCore:
         (Simplified: using SHAKE-128 to generate coefficients uniformly)
         """
         matrix = []
-        # In real Kyber, we use SHAKE128(seed || i || j) and rejection sampling.
+        # Uses SHAKE128(seed || i || j) and rejection sampling.
         # Here we simplify slightly but keep the structure.
         for i in range(self.k):
             row = []
@@ -91,9 +94,9 @@ class KyberCore:
 
     def keypair(self) -> Tuple[Dict, Dict]:
         """
-        Generate Kyber-768 public and secret keys.
+        Generate LWE KEM public and secret keys.
 
-        Follows the Kyber KeyGen specification:
+        Follows the LWE KEM KeyGen specification:
           1. Sample a random 32-byte seed ρ.
           2. Expand A ← SHAKE-128(ρ).
           3. Sample secret key s and error vector e from CBD(η₁).
@@ -116,8 +119,8 @@ class KyberCore:
     def _encode_message(self, message: bytes) -> List[int]:
         """Convert 32-byte message to polynomial."""
         # Each bit becomes a coefficient 0 or (q+1)/2 (approx q/2)
-        # Kyber uses 1 bit per coefficient for message? No.
-        # Kyber encrypts 256 bits (32 bytes).
+        # Encodes message bits as polynomial coefficients.
+        # Encrypts 256 bits (32 bytes).
         # Polynomial has 256 coefficients.
         # Yes, 1 bit per coefficient.
         poly = [0] * self.n
@@ -145,7 +148,7 @@ class KyberCore:
         return bytes(msg_bytes)
 
     def encrypt(self, pk: Dict, message: bytes, coins: bytes) -> Dict:
-        print(f"[DEBUG Kyber] encrypt: pk={pk}, message={message}, coins={coins}")
+        print(f"[DEBUG LWE-KEM] encrypt: pk={pk}, message={message}, coins={coins}")
         """
         PKE Encryption (part of KEM).
         m: 32 bytes message
@@ -171,7 +174,7 @@ class KyberCore:
         # Let's skip the strict deterministic sampling implementation complexity and just use system randomness for now 
         # (BUT this breaks implicit rejection in decapsulation if we were doing FO properly).
         # However, for basic KEM (IND-CPA), system randomness is fine for Encaps.
-        # But Kyber is IND-CCA2 using FO transform.
+        # Full IND-CCA2 requires the Fujisaki-Okamoto transform.
         # So Decaps(ct, sk) needs to re-encrypt.
         
         # I will implement a deterministic sampler helper.
@@ -198,11 +201,11 @@ class KyberCore:
         v_compressed = [compress(c, self.q, self.dv) for c in v]
         
         ct = {'u': u_compressed, 'v': v_compressed}
-        print(f"[DEBUG Kyber] encrypt output: ct={ct}")
+        print(f"[DEBUG LWE-KEM] encrypt output: ct={ct}")
         return ct
 
     def decrypt(self, sk: Dict, ciphertext: Dict) -> bytes:
-        print(f"[DEBUG Kyber] decrypt: sk={sk}, ct={ciphertext}")
+        print(f"[DEBUG LWE-KEM] decrypt: sk={sk}, ct={ciphertext}")
         """
         PKE Decryption.
         """
@@ -220,7 +223,7 @@ class KyberCore:
         m_noisy = self.ring.subtract(v, su)
         
         m_dec = self._decode_message(m_noisy)
-        print(f"[DEBUG Kyber] decrypt output: m={m_dec}")
+        print(f"[DEBUG LWE-KEM] decrypt output: m={m_dec}")
         return m_dec
 
     def encaps(self, pk: Dict) -> Tuple[Dict, bytes]:
@@ -239,7 +242,7 @@ class KyberCore:
         c = self.encrypt(pk, m, coins)
         
         # 4. Hash ciphertext and K to get final shared secret?
-        # Kyber standard: ss = KDF(K || H(c))
+        # ss = KDF(K || H(c))
         # For simplicity, we just return K as shared secret (IND-CPA level).
         # (Full FO transform would do H(m) -> (K, r), c = Enc(pk, m, r), d = H(K || H(c)))
         
@@ -266,7 +269,7 @@ class KyberCore:
         # coins = K_coins[32:]
         # check_ct = self.encrypt(sk['pk'], m, coins)
         # if check_ct != ct:
-        #     return os.urandom(32) # In real Kyber, return H(z || ct)
+        #     return os.urandom(32) # return H(z || ct) for full IND-CCA2
             
         return K
 
@@ -319,5 +322,5 @@ class DeterministicSampler:
     def sample_vector(self, k: int, eta: int) -> List[List[int]]:
         return [self.sample_poly(eta) for _ in range(k)]
 
-# Default instance for Kyber-768
-Kyber768 = KyberCore(k=3, eta1=2, eta2=2, du=10, dv=4)
+# Default instance (768-level parameter set)
+LWEKEMCoreDefault = LWEKEMCore(k=3, eta1=2, eta2=2, du=10, dv=4)

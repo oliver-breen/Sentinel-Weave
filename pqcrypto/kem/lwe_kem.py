@@ -1,8 +1,7 @@
 """
-Kyber-768 KEM interface backed by the QuantaWeave LWE implementation.
+LWE-based KEM interface backed by the QuantaWeave LWE implementation.
 
-Provides a standard bytes-based API compatible with the broader
-SentinelWeave post-quantum cryptography suite:
+Provides a standard bytes-based API for key encapsulation:
 
     generate_keypair() -> (pk_bytes, sk_bytes)
     encrypt(pk_bytes)  -> (ciphertext_bytes, shared_secret_bytes)
@@ -18,7 +17,7 @@ _LEVEL = "LEVEL1"
 
 
 def generate_keypair():
-    """Generate a Kyber-768 compatible keypair.
+    """Generate an LWE KEM keypair.
 
     Returns:
         Tuple[bytes, bytes]: (public_key_bytes, secret_key_bytes).

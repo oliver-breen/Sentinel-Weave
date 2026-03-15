@@ -1,5 +1,5 @@
 """Digital Signature Algorithm implementations."""
 
-from . import dilithium3
+from . import falcon_dsa
 
-__all__ = ["dilithium3"]
+__all__ = ["falcon_dsa"]

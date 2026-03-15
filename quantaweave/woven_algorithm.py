@@ -1,14 +1,12 @@
 """
-The "QuantaWeave" Algorithm: A Robust Hybrid Post-Quantum Scheme.
+The "QuantaWeave" Algorithm: A Robust Hybrid Scheme.
 
-This module weaves together multiple post-quantum primitives into a single,
+This module weaves together multiple cryptographic primitives into a single,
 cohesive algorithm.  It combines:
 - RSA-GCM (classical KEM) for broad compatibility.
-- Kyber-768 / ML-KEM (lattice-based KEM) for PQ security.
+- LWE-based KEM (lattice-based KEM) for quantum-hardness security.
 - HQC-128 (code-based KEM) for redundancy against lattice-specific attacks.
 - Falcon-1024 (lattice-based signature) for data authentication.
-- Dilithium-3 (lattice-based signature, Falcon-backed) for additional
-  signature diversity.
 
 This hybrid approach ensures the system remains secure even if one of the
 underlying mathematical problems is compromised.
@@ -21,10 +19,10 @@ from typing import Tuple, Any, List, Dict, Optional
 from .pq_unified_interface import PQScheme
 from .pq_schemes import (
     UnifiedPQHybrid,
-    KyberScheme,
+    LWEKEMScheme,
     HQCScheme,
     FalconScheme,
-    DilithiumScheme,
+    FalconSignatureScheme,
     RSAGCMScheme,
     _aes_gcm_encrypt,
     _aes_gcm_decrypt,
@@ -38,12 +36,12 @@ class QuantaWeaveAlgorithm(PQScheme):
         self.hybrid = UnifiedPQHybrid(
             kem_schemes=[
                 RSAGCMScheme(),
-                KyberScheme(),
+                LWEKEMScheme(),
                 HQCScheme(),
             ],
             sig_schemes=[
                 FalconScheme(),
-                DilithiumScheme(),
+                FalconSignatureScheme(),
             ],
         )
         self._kem_ids = [

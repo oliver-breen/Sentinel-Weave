@@ -60,7 +60,7 @@ Session Key (32 bytes, random)
               (symmetric, fast)
 ```
 
-**Why hybrid?** The QuantaWeave LWE KEM is limited to 32-byte payloads (by design — it encodes bits as polynomial coefficients). Wrapping a symmetric key is the canonical use of any KEM, mirroring TLS 1.3 and the NIST ML-KEM (Kyber) standards. This protects against "harvest now, decrypt later" quantum attacks on long-lived threat intelligence.
+**Why hybrid?** The QuantaWeave LWE KEM is limited to 32-byte payloads (by design — it encodes bits as polynomial coefficients). Wrapping a symmetric key is the canonical use of any KEM, mirroring TLS 1.3 and standard lattice KEM designs. This protects against "harvest now, decrypt later" attacks on long-lived threat intelligence.
 
 ---
 

@@ -33,7 +33,7 @@ This repository contains:
 - **SentinelWeave** (`sentinel_weave/`) — AI-powered cybersecurity threat
   detection with post-quantum secure reporting.
 - **QuantaWeave** (`quantaweave/`) — Post-quantum cryptography library (LWE
-  encryption, HQC KEM, Falcon signatures, Kyber/Dilithium bindings).
+  encryption, HQC KEM, Falcon signatures, LWE KEM bindings).
 - **Dashboard** (`dashboard/`) — Flask web dashboard for live threat metrics.
 
 > ⚠️ **Note:** The QuantaWeave implementation is primarily educational.

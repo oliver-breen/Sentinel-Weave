@@ -1,39 +1,39 @@
 import unittest
-from quantaweave.kyber import KyberCore
+from quantaweave.lwe_kem_core import LWEKEMCore
 import os
 
-class TestKyberCore(unittest.TestCase):
+class TestLWEKEMCore(unittest.TestCase):
     def setUp(self):
-        self.kyber = KyberCore()
+        self.kem = LWEKEMCore()
 
     def test_keypair_and_encapsulation(self):
-        pk, sk = self.kyber.keypair()
+        pk, sk = self.kem.keypair()
         self.assertIsInstance(pk, dict)
         self.assertIsInstance(sk, dict)
-        ct, ss = self.kyber.encaps(pk)
+        ct, ss = self.kem.encaps(pk)
         self.assertIsInstance(ct, dict)
         self.assertIsInstance(ss, bytes)
-        recovered_ss = self.kyber.decaps(ct, sk)
+        recovered_ss = self.kem.decaps(ct, sk)
         self.assertEqual(ss, recovered_ss)
 
     def test_encryption_and_decryption(self):
-        pk, sk = self.kyber.keypair()
+        pk, sk = self.kem.keypair()
         message = os.urandom(32)
         coins = os.urandom(32)
-        ct = self.kyber.encrypt(pk, message, coins)
-        decrypted = self.kyber.decrypt(sk, ct)
+        ct = self.kem.encrypt(pk, message, coins)
+        decrypted = self.kem.decrypt(sk, ct)
         self.assertEqual(message, decrypted)
 
     def test_parameter_variants(self):
         for params in [
-            {'k':2, 'eta1':3, 'eta2':2, 'du':10, 'dv':4}, # Kyber-512
-            {'k':3, 'eta1':2, 'eta2':2, 'du':10, 'dv':4}, # Kyber-768
-            {'k':4, 'eta1':2, 'eta2':2, 'du':11, 'dv':5}, # Kyber-1024
+            {'k':2, 'eta1':3, 'eta2':2, 'du':10, 'dv':4}, # Small (512-level)
+            {'k':3, 'eta1':2, 'eta2':2, 'du':10, 'dv':4}, # Medium (768-level)
+            {'k':4, 'eta1':2, 'eta2':2, 'du':11, 'dv':5}, # Large (1024-level)
         ]:
-            kyber = KyberCore(**params)
-            pk, sk = kyber.keypair()
-            ct, ss = kyber.encaps(pk)
-            recovered_ss = kyber.decaps(ct, sk)
+            kem = LWEKEMCore(**params)
+            pk, sk = kem.keypair()
+            ct, ss = kem.encaps(pk)
+            recovered_ss = kem.decaps(ct, sk)
             self.assertEqual(ss, recovered_ss)
 
 if __name__ == '__main__':

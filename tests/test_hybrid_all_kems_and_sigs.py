@@ -1,13 +1,13 @@
-from quantaweave.pq_schemes import KyberScheme, HQCScheme, DilithiumScheme, UnifiedPQHybrid
+from quantaweave.pq_schemes import LWEKEMScheme, HQCScheme, FalconSignatureScheme, UnifiedPQHybrid
 import pytest
 
 
 def test_all_three_kems_multiple_sigs():
-    kyber = KyberScheme()
+    lwe = LWEKEMScheme()
     hqc1 = HQCScheme(param_set="HQC-1")
-    dilithium = DilithiumScheme()
+    falcon_sig = FalconSignatureScheme()
     # Use two KEMs and two sig schemes (no dummy)
-    hybrid = UnifiedPQHybrid(kem_schemes=[kyber, hqc1], sig_schemes=[dilithium, dilithium])
+    hybrid = UnifiedPQHybrid(kem_schemes=[lwe, hqc1], sig_schemes=[falcon_sig, falcon_sig])
 
     pub_keys, sec_keys = hybrid.generate_keypair()
     pub_keys = [pk.encode() if isinstance(pk, str) else pk for pk in pub_keys]

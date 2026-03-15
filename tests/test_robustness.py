@@ -1,6 +1,6 @@
 import unittest
 from quantaweave import QuantaWeave
-from quantaweave.pq_schemes import UnifiedPQHybrid, KyberScheme, DilithiumScheme
+from quantaweave.pq_schemes import UnifiedPQHybrid, LWEKEMScheme, FalconSignatureScheme
 
 class TestRobustness(unittest.TestCase):
     """
@@ -68,9 +68,9 @@ class TestRobustness(unittest.TestCase):
 
     def test_hybrid_scheme_mismatch(self):
         """Test UnifiedPQHybrid with mismatched inputs."""
-        kyber = KyberScheme()
-        dilithium = DilithiumScheme()
-        hybrid = UnifiedPQHybrid(kem_schemes=[kyber], sig_schemes=[dilithium])
+        lwe = LWEKEMScheme()
+        falcon_sig = FalconSignatureScheme()
+        hybrid = UnifiedPQHybrid(kem_schemes=[lwe], sig_schemes=[falcon_sig])
         
         pub_keys, sec_keys = hybrid.generate_keypair()
         # Ensure bytes

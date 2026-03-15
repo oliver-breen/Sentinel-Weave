@@ -1,0 +1,19 @@
+apiVersion: v2
+name: sentinel-weave
+description: >
+  AI-powered cybersecurity threat detection with post-quantum secure reporting.
+  Deploys the SentinelWeave dashboard, threat-detection engine, federated
+  threat-intel hub, and threat-hunting query API.
+type: application
+version: 0.1.0
+appVersion: "0.4.0"
+keywords:
+  - security
+  - threat-detection
+  - cybersecurity
+  - post-quantum
+home: https://github.com/oliver-breen/Sentinel-Weave
+sources:
+  - https://github.com/oliver-breen/Sentinel-Weave
+maintainers:
+  - name: Oliver Breen

@@ -98,7 +98,7 @@ class TestPQCKeypairBundle(unittest.TestCase):
         """store_pqc_keypair + load_pqc_keypair round-trips both keys correctly."""
         pk = b"public_key_material_xyz" * 4
         sk = b"secret_key_material_abc" * 4
-        store_pqc_keypair(self.vault, "demo", pk, sk, algorithm="Kyber768")
+        store_pqc_keypair(self.vault, "demo", pk, sk, algorithm="LWE-KEM")
         loaded_pk, loaded_sk = load_pqc_keypair(self.vault, "demo")
         self.assertEqual(pk, loaded_pk)
         self.assertEqual(sk, loaded_sk)

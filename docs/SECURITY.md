@@ -9,7 +9,7 @@ This document provides a security analysis of the QuantaWeave implementation.
 - The repository includes an LWE-based encryption library and a code-based HQC KEM implementation in `quantaweave/hqc/`.
 - The `encapsulation_decapsulation.py` demo uses RSA-OAEP for key wrapping, which is **not** post-quantum secure, and requires the `cryptography` package.
 - The `key_generation.py` file is a disabled RSA keygen example (wrapped in a docstring).
-- `kyber_dilithium_hqc.py` contains placeholders only and does not implement those schemes.
+- `kyber_dilithium_hqc.py` provides the LWE KEM and Falcon signature Python API (C integration is work in progress).
 - `results_v2.md` is a baseline template with sample data, not verified benchmarks.
 - Falcon signatures are provided via a C++ binding and require GMP at build/runtime.
 
@@ -192,8 +192,7 @@ The security of our algorithm is based on the hardness of the LWE problem:
 ### Best Practices
 
 1. **Use Established Libraries**
-   - Consider NIST-approved algorithms (Kyber, Dilithium)
-   - Use battle-tested implementations
+   - Use battle-tested implementations with professional security audits
 
 2. **Combine with Other Security Measures**
    - Use alongside authentication
@@ -210,8 +209,8 @@ The security of our algorithm is based on the hardness of the LWE problem:
 | Scheme | Type | Security Basis | Status |
 |--------|------|----------------|--------|
 | **This Implementation** | Lattice | LWE | Educational |
-| **Kyber** | Lattice | Module-LWE | NIST Selected |
-| **Dilithium** | Lattice | Module-LWE/SIS | NIST Selected |
+| **HQC** | Code-based | Syndrome decoding | Integrated |
+| **Falcon** | Lattice | NTRU lattice | Integrated |
 | **NTRU** | Lattice | NTRU problem | Alternative |
 | **McEliece** | Code-based | Syndrome decoding | Conservative |
 | **SPHINCS+** | Hash-based | Hash function | Stateless signatures |
@@ -266,8 +265,8 @@ The algorithm demonstrates quantum-resistant security properties but requires si
 
 1. Regev, O. (2009). "On lattices, learning with errors, random linear codes, and cryptography." JACM.
 2. NIST Post-Quantum Cryptography Standardization (2022)
-3. Bos et al. (2018). "CRYSTALS - Kyber: A CCA-secure module-lattice-based KEM"
-4. Ducas et al. (2018). "CRYSTALS-Dilithium: A lattice-based digital signature scheme"
+3. Prest et al. (2020). "FALCON: Fast-Fourier Lattice-based Compact Signatures over NTRU"
+4. Melchor et al. (2023). "Hamming Quasi-Cyclic (HQC) specification"
 
 ## Contact
 

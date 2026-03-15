@@ -1,0 +1,130 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sentinel-weave.fullname" . }}
+  labels:
+    {{- include "sentinel-weave.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "sentinel-weave.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "sentinel-weave.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "sentinel-weave.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 5000
+              protocol: TCP
+          env:
+            # -- Non-secret runtime settings --------------------------------
+            {{- range $k, $v := .Values.env }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+            {{- end }}
+            # -- Azure credentials from Helm values -------------------------
+            {{- if and (not .Values.existingSecret) .Values.azure.storageConnectionString }}
+            - name: AZURE_STORAGE_CONNECTION_STRING
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "sentinel-weave.fullname" . }}-azure
+                  key: AZURE_STORAGE_CONNECTION_STRING
+                  optional: true
+            {{- end }}
+            {{- if and (not .Values.existingSecret) .Values.azure.textAnalyticsKey }}
+            - name: AZURE_TEXT_ANALYTICS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "sentinel-weave.fullname" . }}-azure
+                  key: AZURE_TEXT_ANALYTICS_KEY
+                  optional: true
+            {{- end }}
+            # -- Azure credentials from pre-existing secret -----------------
+            {{- if .Values.existingSecret }}
+            - name: AZURE_STORAGE_CONNECTION_STRING
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: AZURE_STORAGE_CONNECTION_STRING
+                  optional: true
+            - name: AZURE_TEXT_ANALYTICS_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: AZURE_TEXT_ANALYTICS_ENDPOINT
+                  optional: true
+            - name: AZURE_TEXT_ANALYTICS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: AZURE_TEXT_ANALYTICS_KEY
+                  optional: true
+            - name: AZURE_APPINSIGHTS_CONNECTION_STRING
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: AZURE_APPINSIGHTS_CONNECTION_STRING
+                  optional: true
+            - name: SENTINELWEAVE_AZURE_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: SENTINELWEAVE_AZURE_ENDPOINT
+                  optional: true
+            - name: SENTINELWEAVE_AZURE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: SENTINELWEAVE_AZURE_API_KEY
+                  optional: true
+            {{- end }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- if .Values.persistence.enabled }}
+          volumeMounts:
+            - name: data
+              mountPath: {{ .Values.persistence.mountPath }}
+          {{- end }}
+      {{- if .Values.persistence.enabled }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "sentinel-weave.fullname" . }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

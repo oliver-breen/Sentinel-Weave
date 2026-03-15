@@ -1,10 +1,8 @@
 """
-Dilithium3 digital signature interface backed by the QuantaWeave Falcon
+Falcon-1024 digital signature interface backed by the QuantaWeave Falcon
 implementation.
 
-Dilithium3 (ML-DSA-65) and Falcon-1024 are both lattice-based signature
-schemes with comparable security levels; this module uses Falcon as the
-underlying engine while presenting a Dilithium3-compatible API:
+Provides a standard bytes-based API for signing and verification:
 
     generate_keypair()              -> (pk_bytes, sk_bytes)
     sign(sk_bytes, message)         -> signature_bytes
@@ -17,7 +15,7 @@ _falcon = FalconSig("Falcon-1024")
 
 
 def generate_keypair():
-    """Generate a Dilithium3-compatible signing keypair.
+    """Generate a Falcon-1024 signing keypair.
 
     Returns:
         Tuple[bytes, bytes]: (public_key_bytes, secret_key_bytes).
