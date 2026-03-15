@@ -1,11 +1,11 @@
 import pytest
-from quantaweave.pq_schemes import KyberScheme, DilithiumScheme, HQCScheme, UnifiedPQHybrid
+from quantaweave.pq_schemes import LWEKEMScheme, FalconSignatureScheme, HQCScheme, UnifiedPQHybrid
 
 def test_hybrid_kem_and_signature():
-    kyber = KyberScheme()
+    lwe = LWEKEMScheme()
     hqc = HQCScheme(param_set="HQC-1")
-    dilithium = DilithiumScheme()
-    hybrid = UnifiedPQHybrid(kem_schemes=[kyber, hqc], sig_schemes=[dilithium])
+    falcon_sig = FalconSignatureScheme()
+    hybrid = UnifiedPQHybrid(kem_schemes=[lwe, hqc], sig_schemes=[falcon_sig])
 
     pub_keys, sec_keys = hybrid.generate_keypair()
     # Ensure all keys are bytes
@@ -21,9 +21,9 @@ def test_hybrid_kem_and_signature():
 
 # Additional customization: test with only one KEM or one signature scheme
 def test_single_scheme_hybrid():
-    kyber = KyberScheme()
-    dilithium = DilithiumScheme()
-    hybrid = UnifiedPQHybrid(kem_schemes=[kyber], sig_schemes=[dilithium])
+    lwe = LWEKEMScheme()
+    falcon_sig = FalconSignatureScheme()
+    hybrid = UnifiedPQHybrid(kem_schemes=[lwe], sig_schemes=[falcon_sig])
 
     pub_keys, sec_keys = hybrid.generate_keypair()
     pub_keys = [pk.encode() if isinstance(pk, str) else pk for pk in pub_keys]

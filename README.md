@@ -5,7 +5,7 @@ Welcome to my GitHub profile! I’m passionate about cryptography, security, and
 ## 🚀 Latest Projects
 
 ### [Quantaweave](https://github.com/oliver-breen/New-Algorithm-for-Post-Quantum-Cryptography)
-A modular, research-driven post-quantum cryptography suite supporting Kyber, Dilithium, HQC, hybrid schemes, and more. Includes:
+A modular, research-driven cryptography suite supporting LWE KEM, HQC, hybrid schemes, and more. Includes:
 - Unified Python interface for KEMs and signatures
 - C/C++ integration with automated DLL builds
 - Extensive test suite and benchmarks
@@ -22,7 +22,7 @@ A modular, research-driven post-quantum cryptography suite supporting Kyber, Dil
 
 ## 🛠️ Technologies
 - Python, C, C++
-- Post-quantum cryptography (Kyber, Dilithium, Falcon, HQC)
+- Post-quantum cryptography (LWE KEM, Falcon, HQC)
 - PyCryptodome, CMake, GitHub Actions
 
 ## 📫 Get in Touch

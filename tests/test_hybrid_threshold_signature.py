@@ -1,11 +1,11 @@
-from quantaweave.pq_schemes import KyberScheme, DilithiumScheme, UnifiedPQHybrid
+from quantaweave.pq_schemes import LWEKEMScheme, FalconSignatureScheme, UnifiedPQHybrid
 import pytest
 
 def test_threshold_signature_verification():
-    # Use two signature schemes (for demonstration, use Dilithium twice)
-    sig1 = DilithiumScheme()
-    sig2 = DilithiumScheme()
-    hybrid = UnifiedPQHybrid(kem_schemes=[KyberScheme()], sig_schemes=[sig1, sig2], sig_threshold=1)
+    # Use two signature schemes (for demonstration, use Falcon twice)
+    sig1 = FalconSignatureScheme()
+    sig2 = FalconSignatureScheme()
+    hybrid = UnifiedPQHybrid(kem_schemes=[LWEKEMScheme()], sig_schemes=[sig1, sig2], sig_threshold=1)
 
     pub_keys, sec_keys = hybrid.generate_keypair()
     pub_keys = [pk.encode() if isinstance(pk, str) else pk for pk in pub_keys]
@@ -25,7 +25,7 @@ def test_threshold_signature_verification():
     assert not hybrid.verify(message, signatures, pub_keys)
 
     # Set threshold=2: only both valid signatures pass
-    hybrid2 = UnifiedPQHybrid(kem_schemes=[KyberScheme()], sig_schemes=[sig1, sig2], sig_threshold=2)
+    hybrid2 = UnifiedPQHybrid(kem_schemes=[LWEKEMScheme()], sig_schemes=[sig1, sig2], sig_threshold=2)
     pub_keys2, sec_keys2 = hybrid2.generate_keypair()
     pub_keys2 = [pk.encode() if isinstance(pk, str) else pk for pk in pub_keys2]
     sec_keys2 = [sk.encode() if isinstance(sk, str) else sk for sk in sec_keys2]

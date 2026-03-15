@@ -197,7 +197,7 @@ assert falcon.verify(public_key, message, signature)
 │   └── falcon_signature.py        # Falcon signature example
 ├── encapsulation_decapsulation.py  # RSA-OAEP key wrap demo (classical)
 ├── key_generation.py               # RSA key generation demo (disabled by default)
-├── kyber_dilithium_hqc.py          # Placeholders for future integration
+├── kyber_dilithium_hqc.py          # LWE KEM and Falcon signature API
 ├── results_v2.md                   # Baseline KEM test template
 ├── pyproject.toml                  # Packaging metadata
 ├── CHANGELOG.md                    # Release notes
@@ -232,7 +232,7 @@ plaintext = pqc.decrypt(ciphertext, private_key)
 ⚠️ **Educational Implementation**: This is designed for learning and understanding post-quantum cryptography.
 
 For production use, please:
-1. Use NIST-standardized algorithms (Kyber, Dilithium)
+1. Use established lattice-based algorithms (LWE KEM, Falcon)
 2. Obtain professional security audits
 3. Implement constant-time operations
 4. Add CCA security transformations
@@ -261,5 +261,5 @@ The implementation serves as an excellent educational resource for understanding
 ### Notes on Demos and Placeholders
 
 - The RSA demos use the `cryptography` package and are not post-quantum secure.
-- `kyber_dilithium_hqc.py` is a placeholder only.
+- `kyber_dilithium_hqc.py` provides the LWE KEM and Falcon signature Python API.
 - `results_v2.md` is a baseline template with sample data.

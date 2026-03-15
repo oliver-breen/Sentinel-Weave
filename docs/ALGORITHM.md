@@ -300,7 +300,7 @@ Potential improvements for future versions:
 - The `encapsulation_decapsulation.py` demo uses RSA-OAEP for key wrapping, which is **not** post-quantum secure. It is provided for hybrid KEM workflow illustration only.
 - Dependencies: the RSA demo requires the `cryptography` package; the LWE core in `quantaweave/` does not.
 - The `key_generation.py` file is a disabled RSA keygen example (wrapped in a docstring).
-- `kyber_dilithium_hqc.py` contains placeholders only and does not implement those schemes.
+- `kyber_dilithium_hqc.py` provides the LWE KEM and Falcon signature Python API (C integration is work in progress).
 
 ## References
 
@@ -308,8 +308,8 @@ This implementation is inspired by:
 
 1. Regev, O. (2005). "On lattices, learning with errors, random linear codes, and cryptography"
 2. NIST Post-Quantum Cryptography Standardization
-3. Kyber: A CCA-secure module-lattice-based KEM
-4. Dilithium: A lattice-based digital signature scheme
+3. Lattice-based KEM constructions (module-LWE)
+4. Lattice-based digital signature schemes
 
 ## License
 
@@ -332,7 +332,7 @@ Oliver Breen
 
 This is an educational implementation. For production use, consider:
 
-1. Using NIST-standardized algorithms (Kyber, Dilithium)
+1. Using established lattice-based algorithms with professional security audits
 2. Professional security audits
 3. Constant-time implementations
 4. Side-channel attack resistance

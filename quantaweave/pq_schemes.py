@@ -11,8 +11,8 @@ try:
 except ImportError:
     _AESGCM_AVAILABLE = False
 
-# Use the real Kyber / Dilithium implementations via the pqcrypto package
-from kyber_dilithium_hqc import kyber_keygen, kyber_encaps, kyber_decaps
+# Use the LWE KEM and Falcon signature implementations via the pqcrypto package
+from kyber_dilithium_hqc import kem_keygen, kem_encaps, kem_decaps
 
 # Use the real HQC implementation
 from quantaweave.hqc.parameters import get_parameters
@@ -22,13 +22,13 @@ from .falcon import FalconSig
 from .rsa_gcm import RSAGCM
 
 
-class KyberScheme(PQScheme):
+class LWEKEMScheme(PQScheme):
     def __init__(self):
         self.pk = None
         self.sk = None
 
     def generate_keypair(self) -> Tuple[bytes, bytes]:
-        result = kyber_keygen()
+        result = kem_keygen()
         pk = result['public_key']
         sk = result['secret_key']
         self.pk = pk
@@ -36,17 +36,17 @@ class KyberScheme(PQScheme):
         return pk, sk
 
     def encapsulate(self, public_key: bytes) -> Tuple[bytes, bytes]:
-        result = kyber_encaps(public_key)
+        result = kem_encaps(public_key)
         return result['ciphertext'], result['shared_secret']
 
     def decapsulate(self, ciphertext: bytes, secret_key: bytes) -> bytes:
-        return kyber_decaps(ciphertext, secret_key)
+        return kem_decaps(ciphertext, secret_key)
 
     def sign(self, message: bytes, secret_key: bytes) -> bytes:
-        raise NotImplementedError("Kyber does not support signatures.")
+        raise NotImplementedError("LWE KEM does not support signatures.")
 
     def verify(self, message: bytes, signature: bytes, public_key: bytes) -> bool:
-        raise NotImplementedError("Kyber does not support signatures.")
+        raise NotImplementedError("LWE KEM does not support signatures.")
 
 
 class HQCScheme(PQScheme):
@@ -89,8 +89,8 @@ class FalconScheme(PQScheme):
         return self.falcon.verify(public_key, message, signature)
 
 
-class DilithiumScheme(PQScheme):
-    """Dilithium-compatible signature scheme backed by FalconSig."""
+class FalconSignatureScheme(PQScheme):
+    """Falcon-1024 backed lattice signature scheme."""
 
     def __init__(self):
         self._falcon = FalconSig("Falcon-1024")
@@ -99,10 +99,10 @@ class DilithiumScheme(PQScheme):
         return self._falcon.keygen()
 
     def encapsulate(self, public_key: bytes) -> Tuple[bytes, bytes]:
-        raise NotImplementedError("Dilithium does not support KEM.")
+        raise NotImplementedError("Falcon does not support KEM.")
 
     def decapsulate(self, ciphertext: bytes, secret_key: bytes) -> bytes:
-        raise NotImplementedError("Dilithium does not support KEM.")
+        raise NotImplementedError("Falcon does not support KEM.")
 
     def sign(self, message: bytes, secret_key: bytes) -> bytes:
         return self._falcon.sign(secret_key, message)
@@ -168,14 +168,14 @@ def _aes_gcm_decrypt(key: bytes, aes_gcm: dict) -> bytes:
 
 class UnifiedPQHybrid(PQScheme):
     def _get_scheme_id(self, scheme):
-        if isinstance(scheme, KyberScheme):
-            return "Kyber"
+        if isinstance(scheme, LWEKEMScheme):
+            return "LWE-KEM"
         elif isinstance(scheme, HQCScheme):
             return "HQC"
         elif isinstance(scheme, FalconScheme):
             return "Falcon"
-        elif isinstance(scheme, DilithiumScheme):
-            return "Dilithium"
+        elif isinstance(scheme, FalconSignatureScheme):
+            return "FalconSig"
         elif isinstance(scheme, RSAGCMScheme):
             return "RSA-GCM"
         else:

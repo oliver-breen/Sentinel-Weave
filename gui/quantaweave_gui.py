@@ -375,7 +375,7 @@ class LweTab(QWidget):
 
     def _on_decaps(self):
         try:
-            pqc = PQCryptoSuite(kem="kyber", sig="dilithium", level=self.level_combo.currentText())
+            pqc = PQCryptoSuite(kem="lwe", sig="falcon", level=self.level_combo.currentText())
             encoding = self.encoding_combo.currentText()
             ciphertext = self.ciphertext_text.toPlainText()
             private_key = self.private_key_text.toPlainText()
@@ -442,7 +442,7 @@ class LweTab(QWidget):
             # If pqc is not defined, fallback to error
             shared_secret = None
             try:
-                pqc = PQCryptoSuite(kem="kyber", sig="dilithium", level=self.level_combo.currentText())
+                pqc = PQCryptoSuite(kem="lwe", sig="falcon", level=self.level_combo.currentText())
                 shared_secret = pqc.hqc_decapsulate(ciphertext, private_key)
             except Exception as exc2:
                 _show_error(self, f"Error: {exc2}")

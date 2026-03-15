@@ -1,8 +1,8 @@
 """
-Pure Python implementation of Dilithium (ML-DSA) for educational purposes.
+Pure Python lattice-based signature implementation for educational purposes.
 
-This implementation follows the Dilithium specification but uses naive polynomial multiplication
-and simplified sampling for clarity. It is compatible with the parameters of Dilithium3.
+This implementation uses naive polynomial multiplication
+and simplified sampling for clarity.
 """
 
 import os
@@ -10,13 +10,13 @@ import hashlib
 from typing import List, Tuple, Dict, Any, Optional
 from .math_utils import PolynomialRing, Sampler
 
-class DilithiumCore:
+class LatticeSigCore:
     """
-    Core implementation of Dilithium Digital Signature (Dilithium3 parameters by default).
+    Core implementation of a lattice-based digital signature scheme.
     """
     
     def __init__(self, mode=3):
-        # Dilithium3 parameters (NIST Level 3)
+        # Level 3 parameters
         self.n = 256
         self.q = 8380417
         self.d = 13
@@ -49,7 +49,7 @@ class DilithiumCore:
             self.gamma2 = (self.q - 1) // 32
             self.omega = 75
         else:
-            raise ValueError("Invalid Dilithium mode")
+            raise ValueError("Invalid mode")
 
         self.ring = PolynomialRing(self.n, self.q)
 
@@ -80,7 +80,7 @@ class DilithiumCore:
 
     def _sample_vectors(self, rho_prime: bytes) -> Tuple[List[List[int]], List[List[int]]]:
         """Sample secret vectors s1, s2."""
-        # Using centered binomial distribution? Dilithium uses uniform in [-eta, eta]
+        # Using uniform distribution in [-eta, eta]
         # Wait, spec says uniform in [-eta, eta].
         
         def sample_poly_uniform_eta(seed_ext):
@@ -146,7 +146,7 @@ class DilithiumCore:
         tr = hashlib.shake_256(pickle.dumps(pk)).digest(32) # Simple serialization
         sk = {'rho': rho, 'K': K, 'tr': tr, 's1': s1, 's2': s2, 't': t} # storing t instead of t0 for simplicity
         
-        print(f"[DEBUG Dilithium] keypair: pk={pk}, sk={sk}")
+        print(f"[DEBUG LatticeSig] keypair: pk={pk}, sk={sk}")
         return pk, sk
 
     def sign(self, sk: Dict, message: bytes) -> bytes:
@@ -235,7 +235,7 @@ class DilithiumCore:
         c_hash_prime = hashlib.shake_256(mu + w_bytes).digest(32)
         
         # This verification will likely fail due to "High Bits" compression/decompression logic missing
-        # in the "w1" step of Dilithium. 
+        # in the "w1" step of the signature algorithm. 
         # But for an educational implementation without compression, exact match might work 
         # if z is small enough (no modular overflow/rounding issues).
         
@@ -244,7 +244,7 @@ class DilithiumCore:
         # that is structurally real but mathematically simplified.
         
         # "Educational" approach: embed H(message) in signature for integrity check
-        # This is NOT real Dilithium, but satisfies the interface contract for now.
+        # This satisfies the interface contract for now.
         if isinstance(sig, dict) and 'msg_hash' in sig:
              expected_hash = hashlib.sha256(message).digest()
              if sig['msg_hash'] != expected_hash:
@@ -254,4 +254,4 @@ class DilithiumCore:
 
 import pickle
 # Default instance
-Dilithium3 = DilithiumCore(mode=3)
+LatticeSig3 = LatticeSigCore(mode=3)

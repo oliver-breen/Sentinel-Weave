@@ -55,8 +55,8 @@ falcon_extension = Extension(
 )
 
 
-# Kyber/Dilithium build config
-kyber_dilithium_include_dirs = [
+# C extension build config for the vendor LWE KEM / lattice sig implementation
+pq_kem_sig_include_dirs = [
     pybind11.get_include(),
     pybind11.get_include(True),
     "vendor/kyber_dilithium",
@@ -64,26 +64,25 @@ kyber_dilithium_include_dirs = [
     "vendor/kyber_dilithium/mldsa",
 ]
 
-# Collect all .c files from mlkem and mldsa
+# Collect all .c files from the vendor KEM and DSA subdirectories
 import glob
-mlkem_sources = glob.glob("vendor/kyber_dilithium/mlkem/*.c")
-mlkem_sources = [
+kem_sources = [
     fname for fname in glob.glob("vendor/kyber_dilithium/mlkem/*.c")
     if not fname.endswith("fips202.c")
 ]
-mldsa_sources = [
+dsa_sources = [
     fname for fname in glob.glob("vendor/kyber_dilithium/mldsa/*.c")
     if not fname.endswith("fips202.c")
 ]
 # Add fips202.c only once from HQC lib
 common_sources = [os.path.join("vendor", "hqc", "lib", "fips202", "fips202.c")]
 
-kyber_dilithium_extension = Extension(
-    "_kyber_dilithium",
+pq_kem_sig_extension = Extension(
+    "_pq_kem_sig",
     sources=[
         "vendor/kyber_dilithium/kyber_dilithium_bindings.cpp",
-    ] + mlkem_sources + mldsa_sources + common_sources,
-    include_dirs=kyber_dilithium_include_dirs,
+    ] + kem_sources + dsa_sources + common_sources,
+    include_dirs=pq_kem_sig_include_dirs,
     language="c++",
     extra_compile_args=["-std=c++20"],
 )
@@ -107,4 +106,4 @@ class BuildExt(_build_ext):
         super().build_extension(ext)
 
 
-setup(ext_modules=[falcon_extension, kyber_dilithium_extension], cmdclass={"build_ext": BuildExt})
+setup(ext_modules=[falcon_extension, pq_kem_sig_extension], cmdclass={"build_ext": BuildExt})
