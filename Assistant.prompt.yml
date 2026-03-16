@@ -7,3 +7,15 @@ messages:
   - role: user
     content: New Programs, Methods, prospects
 model: openai/gpt-4o
+testData: []
+evaluators:
+  - name: Similarity
+    uses: github/similarity
+  - name: Coherence
+    uses: github/coherence
+  - name: Fluency
+    uses: github/fluency
+  - name: Relevance
+    uses: github/relevance
+  - name: Groundedness
+    uses: github/groundedness
