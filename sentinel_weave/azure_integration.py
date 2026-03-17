@@ -24,6 +24,8 @@ Environment variables
     API key for the Text Analytics resource.
 ``AZURE_APPINSIGHTS_CONNECTION_STRING``
     Connection string for an Application Insights resource.
+``AZURE_COSMOS_CONNECTION_STRING``
+    Connection string for a Cosmos DB account.
 
 When these variables are unset the wrappers write to / read from local files
 under ``~/.sentinelweave/`` instead.
@@ -167,6 +169,171 @@ class BlobStorageClient:
         if not blob_dir.exists():
             return []
         return [p.name for p in blob_dir.iterdir() if p.is_file()]
+
+
+# ---------------------------------------------------------------------------
+# Azure Cosmos DB wrapper
+# ---------------------------------------------------------------------------
+
+class CosmosDbClient:
+    """
+    Store and query threat data in Azure Cosmos DB with a local fallback.
+
+    When ``AZURE_COSMOS_CONNECTION_STRING`` is not set the client stores
+    items in ``~/.sentinelweave/cosmos/<db>/<container>.json``.
+
+    Parameters
+    ----------
+    database_name:
+        Cosmos DB database name (default ``"sentinelweave"``).
+    container_name:
+        Cosmos DB container name (default ``"threat-reports"``).
+    connection_string:
+        Cosmos DB connection string. Falls back to the
+        ``AZURE_COSMOS_CONNECTION_STRING`` environment variable.
+    partition_key:
+        Container partition key path (default ``"/id"``).
+    """
+
+    def __init__(
+        self,
+        database_name: str = "sentinelweave",
+        container_name: str = "threat-reports",
+        connection_string: Optional[str] = None,
+        partition_key: str = "/id",
+    ) -> None:
+        self.database_name = database_name
+        self.container_name = container_name
+        self.partition_key = partition_key
+        self._conn_str = (
+            connection_string
+            or os.environ.get("AZURE_COSMOS_CONNECTION_STRING")
+        )
+        self._container = self._init_azure()
+
+    def _init_azure(self):
+        if not self._conn_str:
+            return None
+        try:
+            from azure.cosmos import CosmosClient, PartitionKey  # type: ignore
+
+            client = CosmosClient.from_connection_string(self._conn_str)
+            database = client.create_database_if_not_exists(id=self.database_name)
+            container = database.create_container_if_not_exists(
+                id=self.container_name,
+                partition_key=PartitionKey(path=self.partition_key),
+            )
+            return container
+        except ImportError:
+            return None
+        except Exception:  # noqa: BLE001
+            return None
+
+    @property
+    def is_azure_connected(self) -> bool:
+        return self._container is not None
+
+    def _resolve_partition_key(
+        self,
+        item_id: str,
+        partition_key: Optional[str],
+    ) -> str:
+        if partition_key is not None:
+            return partition_key
+        if self.partition_key == "/id":
+            return item_id
+        raise ValueError("partition_key is required when partition key is not '/id'")
+
+    def _local_path(self) -> Path:
+        _ensure_local_root()
+        local_dir = _LOCAL_ROOT / "cosmos" / self.database_name
+        local_dir.mkdir(parents=True, exist_ok=True)
+        return local_dir / f"{self.container_name}.json"
+
+    def _load_local_items(self) -> list[dict]:
+        path = self._local_path()
+        if not path.exists():
+            return []
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return []
+
+    def _write_local_items(self, items: list[dict]) -> None:
+        path = self._local_path()
+        path.write_text(json.dumps(items, indent=2), encoding="utf-8")
+
+    def upsert_item(self, item: dict) -> dict:
+        if "id" not in item:
+            raise ValueError("item must include an 'id' field")
+
+        if self._container:
+            return self._container.upsert_item(item)
+
+        items = self._load_local_items()
+        item_id = str(item.get("id"))
+        for idx, existing in enumerate(items):
+            if str(existing.get("id")) == item_id:
+                items[idx] = item
+                break
+        else:
+            items.append(item)
+        self._write_local_items(items)
+        return item
+
+    def read_item(
+        self,
+        item_id: str,
+        partition_key: Optional[str] = None,
+    ) -> Optional[dict]:
+        if self._container:
+            pk = self._resolve_partition_key(item_id, partition_key)
+            return self._container.read_item(item=item_id, partition_key=pk)
+
+        items = self._load_local_items()
+        for item in items:
+            if str(item.get("id")) == str(item_id):
+                return item
+        return None
+
+    def delete_item(
+        self,
+        item_id: str,
+        partition_key: Optional[str] = None,
+    ) -> bool:
+        if self._container:
+            pk = self._resolve_partition_key(item_id, partition_key)
+            self._container.delete_item(item=item_id, partition_key=pk)
+            return True
+
+        items = self._load_local_items()
+        remaining = [item for item in items if str(item.get("id")) != str(item_id)]
+        if len(remaining) == len(items):
+            return False
+        self._write_local_items(remaining)
+        return True
+
+    def query_items(
+        self,
+        query: str,
+        parameters: Optional[list[dict]] = None,
+        enable_cross_partition_query: bool = True,
+    ) -> list[dict]:
+        if self._container:
+            return list(
+                self._container.query_items(
+                    query=query,
+                    parameters=parameters,
+                    enable_cross_partition_query=enable_cross_partition_query,
+                )
+            )
+
+        return self._load_local_items()
+
+    def list_items(self) -> list[dict]:
+        if self._container:
+            return self.query_items("SELECT * FROM c")
+        return self._load_local_items()
 
 
 # ---------------------------------------------------------------------------

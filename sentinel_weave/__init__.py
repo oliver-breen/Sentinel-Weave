@@ -53,7 +53,12 @@ __author__  = "Oliver Breen"
 
 from .event_analyzer      import EventAnalyzer, SecurityEvent, analyze_log_file
 from .threat_detector     import ThreatDetector, ThreatReport, ThreatLevel, summarize_reports
-from .azure_integration   import BlobStorageClient, TextAnalyticsClient, SecurityTelemetry
+from .azure_integration   import (
+    BlobStorageClient,
+    TextAnalyticsClient,
+    SecurityTelemetry,
+    CosmosDbClient,
+)
 from .threat_correlator   import ThreatCorrelator, AttackCampaign
 from .ml_pipeline         import (
     SecurityClassifier, DatasetBuilder, LabeledEvent,
@@ -136,6 +141,7 @@ __all__ = [
     "BlobStorageClient",
     "TextAnalyticsClient",
     "SecurityTelemetry",
+    "CosmosDbClient",
     # CIA triad — Confidentiality (RBAC)
     "AccessController",
     "Role",
