@@ -53,11 +53,15 @@ __author__  = "Oliver Breen"
 
 from .event_analyzer      import EventAnalyzer, SecurityEvent, analyze_log_file
 from .threat_detector     import ThreatDetector, ThreatReport, ThreatLevel, summarize_reports
+from .azure_config import AzureConfig
 from .azure_integration   import (
     BlobStorageClient,
     TextAnalyticsClient,
     SecurityTelemetry,
     CosmosDbClient,
+    KeyVaultSecretsClient,
+    ServiceBusQueueClient,
+    EventHubPublisher,
 )
 from .threat_correlator   import ThreatCorrelator, AttackCampaign
 from .ml_pipeline         import (
@@ -138,10 +142,14 @@ __all__ = [
     # ML pipeline — sklearn backed
     "SklearnSecurityClassifier",
     # Azure integration
+    "AzureConfig",
     "BlobStorageClient",
     "TextAnalyticsClient",
     "SecurityTelemetry",
     "CosmosDbClient",
+    "KeyVaultSecretsClient",
+    "ServiceBusQueueClient",
+    "EventHubPublisher",
     # CIA triad — Confidentiality (RBAC)
     "AccessController",
     "Role",

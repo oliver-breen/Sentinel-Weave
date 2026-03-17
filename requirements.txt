@@ -5,6 +5,7 @@ cryptography>=41.0.0
 # ── Dashboard dependencies ─────────────────────────────────────────────────────
 # Required by dashboard/app.py
 flask>=3.0
+click>=8.1
 
 # Required by dashboard/app.py (instantiated eagerly at app startup)
 capstone>=5.0
@@ -16,13 +17,20 @@ pandas>=2.0
 # Uncomment the groups you need:
 
 # Red-team / offensive toolkit (BinaryFuzzer in sentinel_weave.advanced_offensive)
- pwntools>=4.12
+pwntools>=4.12
+
+# Templating (explicit requirement for Flask templates)
+jinja2>=3.1
 
 # Memory forensics (MemoryForensicsScanner in sentinel_weave.advanced_offensive)
- volatility3>=2.7
+volatility3>=2.7
 
 # Azure integrations (sentinel_weave.azure_integration)
- azure-storage-blob>=12.19
- azure-ai-textanalytics>=5.3
- azure-monitor-opentelemetry>=1.3
- azure-cosmos>=4.5
+azure-identity>=1.16
+azure-keyvault-secrets>=4.8
+azure-storage-blob>=12.19
+azure-ai-textanalytics>=5.3
+azure-monitor-opentelemetry>=1.3
+azure-cosmos>=4.5
+azure-servicebus>=7.12
+azure-eventhub>=5.11

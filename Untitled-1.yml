@@ -1,0 +1,10 @@
+$schema: https://azuremlschemas.azureedge.net/latest/azureFile.schema.json
+type: azure_file
+# enter name for your datastore
+name: Ollie 5280
+account_name: <storage-account - ollie 52880
+# enter name of file share
+file_share_name: Emails
+# enter credential details
+credentials:
+  account_key:i dont have it 

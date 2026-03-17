@@ -328,6 +328,22 @@ def create_app(demo_mode: bool = True) -> Flask:
     if demo_mode:
         _start_demo_simulator(store)
 
+    api_token = (
+        os.environ.get("SENTINELWEAVE_API_KEY")
+        or os.environ.get("SENTINELWEAVE_DASHBOARD_API_KEY")
+    )
+
+    def _require_api_key() -> Response | None:
+        if not api_token:
+            return None
+        token = request.headers.get("X-API-Key", "").strip()
+        auth = request.headers.get("Authorization", "").strip()
+        if auth.startswith("Bearer "):
+            token = auth.split(" ", 1)[1].strip()
+        if not token or token != api_token:
+            return jsonify({"error": "unauthorized"}), 401
+        return None
+
     # Expose store on app for testing
     app.store = store  # type: ignore[attr-defined]
 
@@ -423,6 +439,9 @@ def create_app(demo_mode: bool = True) -> Flask:
 
     @app.post("/api/redteam/portscan")
     def api_redteam_portscan() -> Response:
+        auth = _require_api_key()
+        if auth is not None:
+            return auth
         """
         TCP-connect port scan a single host.
 
@@ -478,6 +497,9 @@ def create_app(demo_mode: bool = True) -> Flask:
 
     @app.post("/api/redteam/vulnscan")
     def api_redteam_vulnscan() -> Response:
+        auth = _require_api_key()
+        if auth is not None:
+            return auth
         """
         Check a service banner string against known CVE patterns.
 
@@ -512,6 +534,9 @@ def create_app(demo_mode: bool = True) -> Flask:
 
     @app.post("/api/redteam/credaudit")
     def api_redteam_credaudit() -> Response:
+        auth = _require_api_key()
+        if auth is not None:
+            return auth
         """
         Audit one or more password strings for strength.
 
@@ -548,6 +573,9 @@ def create_app(demo_mode: bool = True) -> Flask:
 
     @app.post("/api/redteam/shellcode")
     def api_redteam_shellcode() -> Response:
+        auth = _require_api_key()
+        if auth is not None:
+            return auth
         """
         Disassemble and classify shellcode bytes.
 
@@ -605,6 +633,9 @@ def create_app(demo_mode: bool = True) -> Flask:
 
     @app.post("/api/redteam/yara")
     def api_redteam_yara() -> Response:
+        auth = _require_api_key()
+        if auth is not None:
+            return auth
         """
         Scan a content buffer against YARA rule sets.
 
@@ -672,6 +703,9 @@ def create_app(demo_mode: bool = True) -> Flask:
 
     @app.post("/api/redteam/anomaly")
     def api_redteam_anomaly() -> Response:
+        auth = _require_api_key()
+        if auth is not None:
+            return auth
         """
         Run unsupervised anomaly detection on a set of security observations.
 
@@ -781,6 +815,9 @@ def create_app(demo_mode: bool = True) -> Flask:
 
     @app.post("/api/federated/peers")
     def api_federated_register_peer() -> Response:
+        auth = _require_api_key()
+        if auth is not None:
+            return auth
         """
         Register a peer node for federated threat-intel exchange.
 
@@ -812,6 +849,9 @@ def create_app(demo_mode: bool = True) -> Flask:
 
     @app.post("/api/federated/share")
     def api_federated_share() -> Response:
+        auth = _require_api_key()
+        if auth is not None:
+            return auth
         """
         Create an encrypted summary of stored reports and return it as JSON.
 
@@ -850,6 +890,9 @@ def create_app(demo_mode: bool = True) -> Flask:
 
     @app.post("/api/federated/receive")
     def api_federated_receive() -> Response:
+        auth = _require_api_key()
+        if auth is not None:
+            return auth
         """
         Accept an encrypted threat-intel bundle from a peer and store it.
 
@@ -877,6 +920,9 @@ def create_app(demo_mode: bool = True) -> Flask:
 
     @app.get("/api/federated/summaries")
     def api_federated_summaries() -> Response:
+        auth = _require_api_key()
+        if auth is not None:
+            return auth
         """Return all received federated threat-intel summaries."""
         return jsonify({
             "summaries": [s.to_dict() for s in fed_hub.list_summaries()],

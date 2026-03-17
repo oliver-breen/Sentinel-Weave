@@ -32,6 +32,7 @@ from quantaweave.azure_keyvault import (
     store_pqc_keypair,
     load_pqc_keypair,
 )
+from quantaweave.safe_serialize import dumps as safe_dumps, loads as safe_loads
 from quantaweave.anomaly_detector import (
     AnomalyDetector,
     CryptoOperationMonitor,
@@ -76,9 +77,8 @@ def run_demo():
     print(f"    Private key size : {len(str(private_key))} chars (repr)")
 
     print("\n--- Step 2: Store keypair in Key Vault ---")
-    import pickle
-    pk_bytes = pickle.dumps(public_key)
-    sk_bytes = pickle.dumps(private_key)
+    pk_bytes = safe_dumps(public_key)
+    sk_bytes = safe_dumps(private_key)
     store_pqc_keypair(
         vault,
         name="demo-quantaweave-key",
@@ -92,8 +92,8 @@ def run_demo():
     # 3. Retrieve and verify round-trip
     print("\n--- Step 3: Retrieve keypair from Key Vault ---")
     loaded_pk_bytes, loaded_sk_bytes = load_pqc_keypair(vault, "demo-quantaweave-key")
-    loaded_pk = pickle.loads(loaded_pk_bytes)
-    loaded_sk = pickle.loads(loaded_sk_bytes)
+    loaded_pk = safe_loads(loaded_pk_bytes)
+    loaded_sk = safe_loads(loaded_sk_bytes)
     assert loaded_pk == public_key, "Public key round-trip mismatch!"
     assert loaded_sk == private_key, "Private key round-trip mismatch!"
     print("    Keypair round-trip: OK")

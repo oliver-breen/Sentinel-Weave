@@ -309,7 +309,7 @@ class TestAzureIntegration(unittest.TestCase):
     def test_keygen_monitored_and_stored(self):
         """Key generation is successfully monitored and stored in the mock vault."""
         from quantaweave import QuantaWeave
-        import pickle
+        from quantaweave.safe_serialize import dumps as safe_dumps
 
         pqc = QuantaWeave("LEVEL1")
         monitor = CryptoOperationMonitor()
@@ -318,8 +318,8 @@ class TestAzureIntegration(unittest.TestCase):
         with monitor.record("keygen"):
             pk, sk = pqc.generate_keypair()
 
-        pk_bytes = pickle.dumps(pk)
-        sk_bytes = pickle.dumps(sk)
+        pk_bytes = safe_dumps(pk)
+        sk_bytes = safe_dumps(sk)
         store_pqc_keypair(vault, "integration-key", pk_bytes, sk_bytes)
 
         loaded_pk_bytes, loaded_sk_bytes = load_pqc_keypair(vault, "integration-key")

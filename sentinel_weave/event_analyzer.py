@@ -15,7 +15,7 @@ import re
 import math
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Sequence
 
 
 # ---------------------------------------------------------------------------
@@ -130,7 +130,7 @@ class EventAnalyzer:
 
         return event
 
-    def parse_bulk(self, lines: list[str]) -> list[SecurityEvent]:
+    def parse_bulk(self, lines: Sequence[str]) -> list[SecurityEvent]:
         """Parse multiple log lines and return a list of events."""
         return [self.parse(line) for line in lines if line.strip()]
 

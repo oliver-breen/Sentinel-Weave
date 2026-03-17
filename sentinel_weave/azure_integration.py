@@ -1,45 +1,31 @@
 """
 Azure Integration — SentinelWeave
 
-Provides thin, offline-safe wrappers around the Azure services that are most
-relevant to a cybersecurity / AI-automation project:
+Credential-first Azure wrappers with offline-safe fallbacks. All clients
+attempt DefaultAzureCredential first, then fall back to explicit secrets
+(connection strings / keys) when provided.
 
-* **Azure Blob Storage** — store encrypted threat reports durably in the cloud.
-* **Azure Cognitive Services – Text Analytics** — classify and extract
-  entities from free-text security descriptions.
-* **Azure Monitor / Application Insights** — emit structured security telemetry.
+Supported services:
+- Azure Blob Storage
+- Azure Cosmos DB
+- Azure Cognitive Services (Text Analytics)
+- Azure Monitor / Application Insights
+- Azure Key Vault (Secrets)
+- Azure Service Bus (Queue)
+- Azure Event Hubs (Producer)
 
-All wrappers degrade gracefully when credentials are absent or the SDK is not
-installed: they operate in a *local fallback mode* so the rest of the pipeline
-never breaks in development / CI environments.
-
-Environment variables
----------------------
-``AZURE_STORAGE_CONNECTION_STRING``
-    Full connection string for the target Azure Storage account.
-``AZURE_TEXT_ANALYTICS_ENDPOINT``
-    Endpoint URL for a Text Analytics resource
-    (e.g. ``https://<name>.cognitiveservices.azure.com/``).
-``AZURE_TEXT_ANALYTICS_KEY``
-    API key for the Text Analytics resource.
-``AZURE_APPINSIGHTS_CONNECTION_STRING``
-    Connection string for an Application Insights resource.
-``AZURE_COSMOS_CONNECTION_STRING``
-    Connection string for a Cosmos DB account.
-
-When these variables are unset the wrappers write to / read from local files
-under ``~/.sentinelweave/`` instead.
+Local fallback writes to ~/.sentinelweave/ when Azure is unavailable.
 """
 
 from __future__ import annotations
 
+import datetime
 import json
 import os
-import hashlib
-import datetime
 from pathlib import Path
 from typing import Optional
 
+from .azure_config import AzureConfig
 
 # ---------------------------------------------------------------------------
 # Local fallback root
@@ -52,6 +38,14 @@ def _ensure_local_root() -> None:
     _LOCAL_ROOT.mkdir(parents=True, exist_ok=True)
 
 
+def _get_credential():
+    try:
+        from azure.identity import DefaultAzureCredential  # type: ignore[import]
+    except Exception:
+        return None
+    return DefaultAzureCredential()
+
+
 # ---------------------------------------------------------------------------
 # Azure Blob Storage wrapper
 # ---------------------------------------------------------------------------
@@ -60,78 +54,63 @@ class BlobStorageClient:
     """
     Upload and download encrypted threat reports to/from Azure Blob Storage.
 
-    When ``AZURE_STORAGE_CONNECTION_STRING`` is not set the client stores
-    blobs as files in ``~/.sentinelweave/blobs/``.
-
-    Parameters
-    ----------
-    container_name:
-        Azure Blob container to use (default ``"sentinelweave-reports"``).
-    connection_string:
-        Azure Storage connection string.  Falls back to the
-        ``AZURE_STORAGE_CONNECTION_STRING`` environment variable.
-
-    Example
-    -------
-    ::
-
-        client = BlobStorageClient()
-        client.upload(b"encrypted_payload", "report-2024-01-15.bin")
-        data = client.download("report-2024-01-15.bin")
+    Falls back to local files under ~/.sentinelweave/blobs/.
     """
 
     def __init__(
         self,
         container_name: str = "sentinelweave-reports",
         connection_string: Optional[str] = None,
+        account_url: Optional[str] = None,
+        config: Optional[AzureConfig] = None,
     ) -> None:
-        self.container_name = container_name
-        self._conn_str = (
-            connection_string
-            or os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
-        )
+        cfg = config or AzureConfig.from_env()
+        self.container_name = container_name or cfg.storage_container
+        self._conn_str = connection_string or cfg.storage_connection_string
+        self._account_url = account_url or cfg.storage_account_url
         self._azure_client = self._init_azure()
 
     def _init_azure(self):
-        """Attempt to initialise the real Azure SDK client."""
-        if not self._conn_str:
-            return None
         try:
-            from azure.storage.blob import BlobServiceClient  # type: ignore
-            svc = BlobServiceClient.from_connection_string(self._conn_str)
+            from azure.storage.blob import BlobServiceClient  # type: ignore[import]
+        except Exception:
+            return None
+
+        if self._conn_str:
+            try:
+                svc = BlobServiceClient.from_connection_string(self._conn_str)
+            except Exception:
+                return None
+        elif self._account_url:
+            credential = _get_credential()
+            if credential is None:
+                return None
+            try:
+                svc = BlobServiceClient(account_url=self._account_url, credential=credential)
+            except Exception:
+                return None
+        else:
+            return None
+
+        try:
             container = svc.get_container_client(self.container_name)
             try:
                 container.create_container()
-            except Exception:  # noqa: BLE001
-                pass  # container likely already exists
+            except Exception:
+                pass
             return container
-        except ImportError:
-            return None
-        except Exception:  # noqa: BLE001
+        except Exception:
             return None
 
     @property
     def is_azure_connected(self) -> bool:
-        """True when a live Azure Storage connection is available."""
         return self._azure_client is not None
 
     def upload(self, data: bytes, blob_name: str) -> str:
-        """
-        Upload *data* as a blob.
-
-        Args:
-            data:      Raw bytes to upload.
-            blob_name: Destination blob name / key.
-
-        Returns:
-            URI-style string identifying the stored blob
-            (``azure://<container>/<name>`` or ``local://<path>``).
-        """
         if self._azure_client:
             self._azure_client.upload_blob(blob_name, data, overwrite=True)
             return f"azure://{self.container_name}/{blob_name}"
 
-        # Local fallback
         _ensure_local_root()
         path = _LOCAL_ROOT / "blobs" / blob_name
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -139,18 +118,6 @@ class BlobStorageClient:
         return f"local://{path}"
 
     def download(self, blob_name: str) -> bytes:
-        """
-        Download a blob by name.
-
-        Args:
-            blob_name: Blob / file name to retrieve.
-
-        Returns:
-            Raw bytes.
-
-        Raises:
-            FileNotFoundError: If the blob does not exist in local mode.
-        """
         if self._azure_client:
             stream = self._azure_client.download_blob(blob_name)
             return stream.readall()
@@ -161,7 +128,6 @@ class BlobStorageClient:
         return path.read_bytes()
 
     def list_blobs(self) -> list[str]:
-        """Return a list of all blob names in the container."""
         if self._azure_client:
             return [b.name for b in self._azure_client.list_blobs()]
 
@@ -177,22 +143,9 @@ class BlobStorageClient:
 
 class CosmosDbClient:
     """
-    Store and query threat data in Azure Cosmos DB with a local fallback.
+    Store and query threat data in Azure Cosmos DB with local fallback.
 
-    When ``AZURE_COSMOS_CONNECTION_STRING`` is not set the client stores
-    items in ``~/.sentinelweave/cosmos/<db>/<container>.json``.
-
-    Parameters
-    ----------
-    database_name:
-        Cosmos DB database name (default ``"sentinelweave"``).
-    container_name:
-        Cosmos DB container name (default ``"threat-reports"``).
-    connection_string:
-        Cosmos DB connection string. Falls back to the
-        ``AZURE_COSMOS_CONNECTION_STRING`` environment variable.
-    partition_key:
-        Container partition key path (default ``"/id"``).
+    Local fallback stores items in ~/.sentinelweave/cosmos/<db>/<container>.json
     """
 
     def __init__(
@@ -200,44 +153,49 @@ class CosmosDbClient:
         database_name: str = "sentinelweave",
         container_name: str = "threat-reports",
         connection_string: Optional[str] = None,
+        endpoint: Optional[str] = None,
         partition_key: str = "/id",
+        config: Optional[AzureConfig] = None,
     ) -> None:
-        self.database_name = database_name
-        self.container_name = container_name
-        self.partition_key = partition_key
-        self._conn_str = (
-            connection_string
-            or os.environ.get("AZURE_COSMOS_CONNECTION_STRING")
-        )
+        cfg = config or AzureConfig.from_env()
+        self.database_name = database_name or cfg.cosmos_database
+        self.container_name = container_name or cfg.cosmos_container
+        self.partition_key = partition_key or cfg.cosmos_partition_key
+        self._conn_str = connection_string or cfg.cosmos_connection_string
+        self._endpoint = endpoint or cfg.cosmos_endpoint
         self._container = self._init_azure()
 
     def _init_azure(self):
-        if not self._conn_str:
-            return None
         try:
-            from azure.cosmos import CosmosClient, PartitionKey  # type: ignore
+            from azure.cosmos import CosmosClient, PartitionKey  # type: ignore[import]
+        except Exception:
+            return None
 
-            client = CosmosClient.from_connection_string(self._conn_str)
+        try:
+            if self._conn_str:
+                client = CosmosClient.from_connection_string(self._conn_str)
+            elif self._endpoint:
+                credential = _get_credential()
+                if credential is None:
+                    return None
+                client = CosmosClient(self._endpoint, credential=credential)
+            else:
+                return None
+
             database = client.create_database_if_not_exists(id=self.database_name)
             container = database.create_container_if_not_exists(
                 id=self.container_name,
                 partition_key=PartitionKey(path=self.partition_key),
             )
             return container
-        except ImportError:
-            return None
-        except Exception:  # noqa: BLE001
+        except Exception:
             return None
 
     @property
     def is_azure_connected(self) -> bool:
         return self._container is not None
 
-    def _resolve_partition_key(
-        self,
-        item_id: str,
-        partition_key: Optional[str],
-    ) -> str:
+    def _resolve_partition_key(self, item_id: str, partition_key: Optional[str]) -> str:
         if partition_key is not None:
             return partition_key
         if self.partition_key == "/id":
@@ -281,11 +239,7 @@ class CosmosDbClient:
         self._write_local_items(items)
         return item
 
-    def read_item(
-        self,
-        item_id: str,
-        partition_key: Optional[str] = None,
-    ) -> Optional[dict]:
+    def read_item(self, item_id: str, partition_key: Optional[str] = None) -> Optional[dict]:
         if self._container:
             pk = self._resolve_partition_key(item_id, partition_key)
             return self._container.read_item(item=item_id, partition_key=pk)
@@ -296,11 +250,7 @@ class CosmosDbClient:
                 return item
         return None
 
-    def delete_item(
-        self,
-        item_id: str,
-        partition_key: Optional[str] = None,
-    ) -> bool:
+    def delete_item(self, item_id: str, partition_key: Optional[str] = None) -> bool:
         if self._container:
             pk = self._resolve_partition_key(item_id, partition_key)
             self._container.delete_item(item=item_id, partition_key=pk)
@@ -327,7 +277,6 @@ class CosmosDbClient:
                     enable_cross_partition_query=enable_cross_partition_query,
                 )
             )
-
         return self._load_local_items()
 
     def list_items(self) -> list[dict]:
@@ -343,46 +292,37 @@ class CosmosDbClient:
 class TextAnalyticsClient:
     """
     Analyse free-text security messages using Azure Cognitive Services
-    Text Analytics (sentiment, key phrases, entity recognition, PII detection).
-
-    Falls back to a simple keyword-based local implementation when credentials
-    are absent.
-
-    Parameters
-    ----------
-    endpoint:
-        Cognitive Services resource endpoint URL.
-    api_key:
-        Resource API key.
-
-    Example
-    -------
-    ::
-
-        client = TextAnalyticsClient()
-        result = client.analyze("Suspicious login attempt from unknown IP")
-        print(result["sentiment"], result["key_phrases"])
+    Text Analytics, with local fallback when not configured.
     """
 
     def __init__(
         self,
         endpoint: Optional[str] = None,
         api_key: Optional[str] = None,
+        config: Optional[AzureConfig] = None,
     ) -> None:
-        self._endpoint = endpoint or os.environ.get("AZURE_TEXT_ANALYTICS_ENDPOINT")
-        self._api_key  = api_key  or os.environ.get("AZURE_TEXT_ANALYTICS_KEY")
+        cfg = config or AzureConfig.from_env()
+        self._endpoint = endpoint or cfg.text_analytics_endpoint
+        self._api_key = api_key or cfg.text_analytics_key
         self._azure_client = self._init_azure()
 
     def _init_azure(self):
-        if not (self._endpoint and self._api_key):
+        if not self._endpoint:
             return None
         try:
-            from azure.ai.textanalytics import TextAnalyticsClient as AzTAC  # type: ignore
-            from azure.core.credentials import AzureKeyCredential            # type: ignore
-            return AzTAC(self._endpoint, AzureKeyCredential(self._api_key))
-        except ImportError:
+            from azure.ai.textanalytics import TextAnalyticsClient as AzTAC  # type: ignore[import]
+            from azure.core.credentials import AzureKeyCredential  # type: ignore[import]
+        except Exception:
             return None
-        except Exception:  # noqa: BLE001
+
+        try:
+            if self._api_key:
+                return AzTAC(self._endpoint, AzureKeyCredential(self._api_key))
+            credential = _get_credential()
+            if credential is None:
+                return None
+            return AzTAC(self._endpoint, credential)
+        except Exception:
             return None
 
     @property
@@ -390,55 +330,32 @@ class TextAnalyticsClient:
         return self._azure_client is not None
 
     def analyze(self, text: str) -> dict:
-        """
-        Analyse *text* and return a structured result dict.
-
-        Keys always present in the return value:
-
-        * ``sentiment``   – ``"positive"``, ``"negative"``, or ``"neutral"``
-        * ``key_phrases`` – list of extracted key phrases
-        * ``entities``    – list of ``{text, category}`` dicts
-        * ``pii_redacted``– version of *text* with PII replaced by ``[REDACTED]``
-        * ``source``      – ``"azure"`` or ``"local"``
-
-        Args:
-            text: The security event or log message to analyse.
-
-        Returns:
-            Analysis result dictionary.
-        """
         if self._azure_client:
             return self._analyze_azure(text)
         return self._analyze_local(text)
 
-    # ------------------------------------------------------------------
-    # Azure implementation
-    # ------------------------------------------------------------------
-
     def _analyze_azure(self, text: str) -> dict:
+        if self._azure_client is None:
+            return self._analyze_local(text)
         try:
+            client = self._azure_client
             docs = [text]
-            sentiment_result = self._azure_client.analyze_sentiment(docs)[0]
-            kp_result        = self._azure_client.extract_key_phrases(docs)[0]
-            ner_result       = self._azure_client.recognize_entities(docs)[0]
-            pii_result       = self._azure_client.recognize_pii_entities(docs)[0]
+            sentiment_result = client.analyze_sentiment(docs)[0]
+            kp_result = client.extract_key_phrases(docs)[0]
+            ner_result = client.recognize_entities(docs)[0]
+            pii_result = client.recognize_pii_entities(docs)[0]
 
             return {
-                "sentiment":    sentiment_result.sentiment,
-                "key_phrases":  list(kp_result.key_phrases),
-                "entities":     [{"text": e.text, "category": e.category} for e in ner_result.entities],
+                "sentiment": sentiment_result.sentiment,
+                "key_phrases": list(kp_result.key_phrases),
+                "entities": [{"text": e.text, "category": e.category} for e in ner_result.entities],
                 "pii_redacted": pii_result.redacted_text,
-                "source":       "azure",
+                "source": "azure",
             }
-        except Exception as exc:  # noqa: BLE001
-            # Fall back gracefully on any Azure error
+        except Exception as exc:
             result = self._analyze_local(text)
             result["azure_error"] = str(exc)
             return result
-
-    # ------------------------------------------------------------------
-    # Local (offline) implementation
-    # ------------------------------------------------------------------
 
     _NEGATIVE_WORDS = {
         "failed", "error", "denied", "refused", "attack", "malicious",
@@ -464,25 +381,22 @@ class TextAnalyticsClient:
         else:
             sentiment = "neutral"
 
-        # Simple key-phrase extraction: capitalised words + nouns after verbs
         key_phrases = list({
             w for w in text.split()
             if len(w) > 4 and (w[0].isupper() or w.lower() in self._NEGATIVE_WORDS | self._POSITIVE_WORDS)
         })[:10]
 
-        # Naive IP / hostname entity recognition
         ip_re = re.compile(r"\b\d{1,3}(?:\.\d{1,3}){3}\b")
         entities = [{"text": ip, "category": "IPAddress"} for ip in ip_re.findall(text)]
 
-        # Redact IPs for PII
         pii_redacted = ip_re.sub("[REDACTED]", text)
 
         return {
-            "sentiment":    sentiment,
-            "key_phrases":  key_phrases,
-            "entities":     entities,
+            "sentiment": sentiment,
+            "key_phrases": key_phrases,
+            "entities": entities,
             "pii_redacted": pii_redacted,
-            "source":       "local",
+            "source": "local",
         }
 
 
@@ -494,27 +408,11 @@ class SecurityTelemetry:
     """
     Emit structured security events to Azure Monitor / Application Insights
     or to a local JSON log file when the SDK is not configured.
-
-    Parameters
-    ----------
-    connection_string:
-        Application Insights connection string.  Falls back to the
-        ``AZURE_APPINSIGHTS_CONNECTION_STRING`` environment variable.
-
-    Example
-    -------
-    ::
-
-        telemetry = SecurityTelemetry()
-        telemetry.track_threat(threat_level="HIGH", source_ip="10.0.0.1",
-                               signatures=["SSH_BRUTE_FORCE"])
     """
 
-    def __init__(self, connection_string: Optional[str] = None) -> None:
-        self._conn_str = (
-            connection_string
-            or os.environ.get("AZURE_APPINSIGHTS_CONNECTION_STRING")
-        )
+    def __init__(self, connection_string: Optional[str] = None, config: Optional[AzureConfig] = None) -> None:
+        cfg = config or AzureConfig.from_env()
+        self._conn_str = connection_string or cfg.appinsights_connection_string
         self._azure_client = self._init_azure()
         self._local_log = _LOCAL_ROOT / "telemetry.jsonl"
 
@@ -522,13 +420,11 @@ class SecurityTelemetry:
         if not self._conn_str:
             return None
         try:
-            from azure.monitor.opentelemetry import configure_azure_monitor  # type: ignore
+            from azure.monitor.opentelemetry import configure_azure_monitor  # type: ignore[import]
             configure_azure_monitor(connection_string=self._conn_str)
             import logging
             return logging.getLogger("sentinelweave")
-        except ImportError:
-            return None
-        except Exception:  # noqa: BLE001
+        except Exception:
             return None
 
     @property
@@ -543,46 +439,28 @@ class SecurityTelemetry:
         anomaly_score: float = 0.0,
         extra: Optional[dict] = None,
     ) -> None:
-        """
-        Record a detected threat event.
-
-        Args:
-            threat_level:   Categorical severity string (e.g. ``"HIGH"``).
-            source_ip:      Source IP address (may be None).
-            signatures:     List of matched attack signature names.
-            anomaly_score:  0.0–1.0 composite anomaly score.
-            extra:          Any additional key/value pairs to include.
-        """
         payload = {
-            "timestamp":     datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            "event_type":    "ThreatDetected",
-            "threat_level":  threat_level,
-            "source_ip":     source_ip,
-            "signatures":    signatures or [],
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "event_type": "ThreatDetected",
+            "threat_level": threat_level,
+            "source_ip": source_ip,
+            "signatures": signatures or [],
             "anomaly_score": anomaly_score,
             **(extra or {}),
         }
 
         if self._azure_client:
             try:
-                import logging
                 self._azure_client.warning(json.dumps(payload))
                 return
-            except Exception:  # noqa: BLE001
+            except Exception:
                 pass
 
-        # Local JSON-lines fallback
         _ensure_local_root()
         with self._local_log.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(payload) + "\n")
 
     def get_local_events(self) -> list[dict]:
-        """
-        Read all events written to the local telemetry log.
-
-        Returns:
-            List of event dicts (empty list if the log does not exist).
-        """
         if not self._local_log.exists():
             return []
         events = []
@@ -595,3 +473,182 @@ class SecurityTelemetry:
                     except json.JSONDecodeError:
                         continue
         return events
+
+
+# ---------------------------------------------------------------------------
+# Azure Key Vault (Secrets) wrapper
+# ---------------------------------------------------------------------------
+
+class KeyVaultSecretsClient:
+    """Simple Key Vault secrets client with local fallback."""
+
+    def __init__(self, vault_url: Optional[str] = None, config: Optional[AzureConfig] = None) -> None:
+        cfg = config or AzureConfig.from_env()
+        self._vault_url = vault_url or cfg.key_vault_url
+        self._client = self._init_azure()
+        self._local_path = _LOCAL_ROOT / "keyvault.json"
+
+    def _init_azure(self):
+        if not self._vault_url:
+            return None
+        credential = _get_credential()
+        if credential is None:
+            return None
+        try:
+            from azure.keyvault.secrets import SecretClient  # type: ignore[import]
+            return SecretClient(vault_url=self._vault_url, credential=credential)
+        except Exception:
+            return None
+
+    @property
+    def is_azure_connected(self) -> bool:
+        return self._client is not None
+
+    def set_secret(self, name: str, value: str) -> None:
+        if self._client:
+            self._client.set_secret(name, value)
+            return
+        _ensure_local_root()
+        data = self._load_local()
+        data[name] = value
+        self._save_local(data)
+
+    def get_secret(self, name: str) -> Optional[str]:
+        if self._client:
+            return self._client.get_secret(name).value
+        data = self._load_local()
+        return data.get(name)
+
+    def _load_local(self) -> dict:
+        if not self._local_path.exists():
+            return {}
+        try:
+            return json.loads(self._local_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return {}
+
+    def _save_local(self, data: dict) -> None:
+        self._local_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# Azure Service Bus (Queue) wrapper
+# ---------------------------------------------------------------------------
+
+class ServiceBusQueueClient:
+    """Send messages to an Azure Service Bus queue with local fallback."""
+
+    def __init__(
+        self,
+        queue_name: str = "sentinelweave-events",
+        connection_string: Optional[str] = None,
+        namespace: Optional[str] = None,
+        config: Optional[AzureConfig] = None,
+    ) -> None:
+        cfg = config or AzureConfig.from_env()
+        self.queue_name = queue_name or cfg.service_bus_queue
+        self._conn_str = connection_string or cfg.service_bus_connection_string
+        self._namespace = namespace or cfg.service_bus_namespace
+        self._client = self._init_azure()
+        self._local_path = _LOCAL_ROOT / "servicebus" / f"{self.queue_name}.jsonl"
+
+    def _init_azure(self):
+        try:
+            from azure.servicebus import ServiceBusClient  # type: ignore[import]
+        except Exception:
+            return None
+
+        try:
+            if self._conn_str:
+                return ServiceBusClient.from_connection_string(self._conn_str)
+            if self._namespace:
+                credential = _get_credential()
+                if credential is None:
+                    return None
+                return ServiceBusClient(self._namespace, credential)
+            return None
+        except Exception:
+            return None
+
+    @property
+    def is_azure_connected(self) -> bool:
+        return self._client is not None
+
+    def send(self, message: str) -> None:
+        if self._client:
+            from azure.servicebus import ServiceBusMessage  # type: ignore[import]
+            with self._client:
+                sender = self._client.get_queue_sender(queue_name=self.queue_name)
+                with sender:
+                    sender.send_messages(ServiceBusMessage(message))
+            return
+
+        _ensure_local_root()
+        self._local_path.parent.mkdir(parents=True, exist_ok=True)
+        with self._local_path.open("a", encoding="utf-8") as fh:
+            fh.write(message + "\n")
+
+
+# ---------------------------------------------------------------------------
+# Azure Event Hubs (Producer) wrapper
+# ---------------------------------------------------------------------------
+
+class EventHubPublisher:
+    """Publish events to Azure Event Hubs with local fallback."""
+
+    def __init__(
+        self,
+        hub_name: str = "sentinelweave-events",
+        connection_string: Optional[str] = None,
+        namespace: Optional[str] = None,
+        config: Optional[AzureConfig] = None,
+    ) -> None:
+        cfg = config or AzureConfig.from_env()
+        self.hub_name = hub_name or cfg.event_hub_name
+        self._conn_str = connection_string or cfg.event_hubs_connection_string
+        self._namespace = namespace or cfg.event_hubs_namespace
+        self._client = self._init_azure()
+        self._local_path = _LOCAL_ROOT / "eventhubs" / f"{self.hub_name}.jsonl"
+
+    def _init_azure(self):
+        try:
+            from azure.eventhub import EventHubProducerClient  # type: ignore[import]
+        except Exception:
+            return None
+
+        try:
+            if self._conn_str:
+                return EventHubProducerClient.from_connection_string(
+                    conn_str=self._conn_str, eventhub_name=self.hub_name
+                )
+            if self._namespace:
+                credential = _get_credential()
+                if credential is None:
+                    return None
+                return EventHubProducerClient(
+                    fully_qualified_namespace=self._namespace,
+                    eventhub_name=self.hub_name,
+                    credential=credential,
+                )
+            return None
+        except Exception:
+            return None
+
+    @property
+    def is_azure_connected(self) -> bool:
+        return self._client is not None
+
+    def publish(self, event: dict) -> None:
+        payload = json.dumps(event)
+        if self._client:
+            from azure.eventhub import EventData  # type: ignore[import]
+            with self._client:
+                batch = self._client.create_batch()
+                batch.add(EventData(payload))
+                self._client.send_batch(batch)
+            return
+
+        _ensure_local_root()
+        self._local_path.parent.mkdir(parents=True, exist_ok=True)
+        with self._local_path.open("a", encoding="utf-8") as fh:
+            fh.write(payload + "\n")

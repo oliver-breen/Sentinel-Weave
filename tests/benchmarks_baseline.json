@@ -1,18 +1,18 @@
 {
   "lwe_round_trip_level1": {
-    "max_ms": 43.71121100120945,
+    "max_ms": 26.722499999777938,
     "notes": "Level1 LWE encrypt+decrypt"
   },
   "hqc_round_trip_level1": {
-    "max_ms": 83.98442099860404,
+    "max_ms": 64.17220000002999,
     "notes": "HQC-1 KEM encaps+decaps"
   },
   "hqc_round_trip_level3": {
-    "max_ms": 392.9102959991724,
+    "max_ms": 206.50350000005346,
     "notes": "HQC-3 KEM encaps+decaps"
   },
   "hqc_round_trip_level5": {
-    "max_ms": 522.7453869993042,
+    "max_ms": 1617.589100000032,
     "notes": "HQC-5 KEM encaps+decaps"
   }
 }

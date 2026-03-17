@@ -4,7 +4,7 @@ This repository is an educational implementation. Use it as a reference and appl
 
 ## Dependency Policy
 
-- Runtime dependencies: none
+- Runtime dependencies: core Python + optional Azure SDKs when Azure features are enabled
 - Optional development dependencies: ruff, mypy, build
 - Pin all development dependencies in CI
 
@@ -20,6 +20,7 @@ This repository is an educational implementation. Use it as a reference and appl
 - Avoid branching on HQC decapsulation failures.
 - Use secure key storage and rotation.
 - Validate input sizes and enforce strict parsing.
+- Validate Azure environment configuration before deployment.
 
 ## CI Gates
 

@@ -143,7 +143,8 @@ class LatticeSigCore:
         
         # Secret key: (rho, K, tr, s1, s2, t0)
         # tr = H(pk)
-        tr = hashlib.shake_256(pickle.dumps(pk)).digest(32) # Simple serialization
+        from .safe_serialize import dumps as safe_dumps
+        tr = hashlib.shake_256(safe_dumps(pk)).digest(32) # Simple serialization
         sk = {'rho': rho, 'K': K, 'tr': tr, 's1': s1, 's2': s2, 't': t} # storing t instead of t0 for simplicity
         
         print(f"[DEBUG LatticeSig] keypair: pk={pk}, sk={sk}")
@@ -172,7 +173,8 @@ class LatticeSigCore:
         
         # 3. c = H(mu || w1)
         # For simplicity, hash whole w
-        w_bytes = pickle.dumps(w)
+        from .safe_serialize import dumps as safe_dumps
+        w_bytes = safe_dumps(w)
         c_hash = hashlib.shake_256(mu + w_bytes).digest(32)
         
         # 4. z = y + c * s1
@@ -193,14 +195,16 @@ class LatticeSigCore:
         # Returning a simplified signature
         # Include msg_hash for simplified integrity check
         msg_hash = hashlib.sha256(message).digest()
-        return pickle.dumps({'z': z, 'c': c_hash, 'msg_hash': msg_hash})
+        from .safe_serialize import dumps as safe_dumps
+        return safe_dumps({'z': z, 'c': c_hash, 'msg_hash': msg_hash})
 
     def verify(self, pk: Dict, message: bytes, signature: bytes) -> bool:
         """
         Verify a signature.
         """
         try:
-            sig = pickle.loads(signature)
+            from .safe_serialize import loads as safe_loads
+            sig = safe_loads(signature)
             z = sig['z']
             c_hash = sig['c']
         except:
@@ -210,7 +214,8 @@ class LatticeSigCore:
         
         # mu = CRH(tr || message)
         # tr needed from pk? standard says tr is H(pk)
-        tr = hashlib.shake_256(pickle.dumps(pk)).digest(32)
+        from .safe_serialize import dumps as safe_dumps
+        tr = hashlib.shake_256(safe_dumps(pk)).digest(32)
         mu = hashlib.shake_256(tr + message).digest(64)
         
         # c = H(mu || w1)
@@ -231,7 +236,8 @@ class LatticeSigCore:
             res = self.ring.subtract(Az[i], ct[i])
             w_approx.append(res)
             
-        w_bytes = pickle.dumps(w_approx)
+        from .safe_serialize import dumps as safe_dumps
+        w_bytes = safe_dumps(w_approx)
         c_hash_prime = hashlib.shake_256(mu + w_bytes).digest(32)
         
         # This verification will likely fail due to "High Bits" compression/decompression logic missing
@@ -252,6 +258,5 @@ class LatticeSigCore:
         
         return True
 
-import pickle
 # Default instance
 LatticeSig3 = LatticeSigCore(mode=3)

@@ -79,18 +79,18 @@ from sentinel_weave.availability_monitor import (
 # ===========================================================================
 
 _C = {
-    "bg":       "#1e1e2e",
-    "surface":  "#2a2a3e",
-    "border":   "#44475a",
-    "text":     "#cdd6f4",
-    "muted":    "#6c7086",
-    "accent":   "#89b4fa",
-    "green":    "#a6e3a1",
-    "yellow":   "#f9e2af",
-    "orange":   "#fab387",
-    "red":      "#f38ba8",
-    "critical": "#ff2a6d",
-    "header":   "#313244",
+    "bg":       "#101214",
+    "surface":  "#191d22",
+    "border":   "#2b3138",
+    "text":     "#e6e2d8",
+    "muted":    "#8b9097",
+    "accent":   "#c2a66a",
+    "green":    "#7fb08a",
+    "yellow":   "#d3b46a",
+    "orange":   "#c68c63",
+    "red":      "#c26b6b",
+    "critical": "#b84d4d",
+    "header":   "#22272e",
 }
 
 _THREAT_COLOUR = {
@@ -149,10 +149,19 @@ def _make_button(text: str, colour: str | None = None) -> QPushButton:
     btn = QPushButton(text)
     bg = colour or _C["accent"]
     btn.setStyleSheet(
-        f"QPushButton {{ background: {bg}; color: {_C['bg']}; border-radius: 4px;"
-        f"  padding: 6px 12px; font-weight: bold; }}"
-        f"QPushButton:hover {{ background: white; }}"
-        f"QPushButton:pressed {{ background: {_C['muted']}; }}"
+        f"QPushButton {{"
+        f"  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,"
+        f"    stop:0 {bg}, stop:1 {_C['surface']});"
+        f"  color: {_C['text']};"
+        f"  border: 1px solid {_C['border']};"
+        f"  border-radius: 6px; padding: 7px 12px; font-weight: 600;"
+        f"}}"
+        f"QPushButton:hover {{"
+        f"  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,"
+        f"    stop:0 {_C['header']}, stop:1 {bg});"
+        f"}}"
+        f"QPushButton:pressed {{ background: {_C['bg']}; }}"
+        f"QPushButton:disabled {{ background: {_C['header']}; color: {_C['muted']}; }}"
     )
     return btn
 
@@ -170,10 +179,14 @@ def _section(title: str) -> QGroupBox:
 def _table(headers: list[str]) -> QTableWidget:
     tbl = QTableWidget(0, len(headers))
     tbl.setHorizontalHeaderLabels(headers)
-    tbl.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+    header = tbl.horizontalHeader()
+    if header is not None:
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
     tbl.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
     tbl.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-    tbl.verticalHeader().setVisible(False)
+    vheader = tbl.verticalHeader()
+    if vheader is not None:
+        vheader.setVisible(False)
     tbl.setStyleSheet(
         f"QTableWidget {{ background: {_C['surface']}; color: {_C['text']};"
         f"  gridline-color: {_C['border']}; border: none; }}"
@@ -881,10 +894,13 @@ class MLPipelineTab(QWidget):
         self._train_status.setText(msg)
 
     def _on_finished(self, metrics: dict, clf: object) -> None:
-        if clf is None:
+        from typing import cast
+
+        typed_clf = cast(SecurityClassifier | None, clf)
+        if typed_clf is None:
             self._train_log.appendPlainText("✗ Training failed.")
             return
-        self._state.classifier = clf
+        self._state.classifier = typed_clf
         lines = ["✔ Training complete:"]
         for m, v in metrics.items():
             label = self._metric_labels.get(m)
@@ -951,21 +967,27 @@ class AccessControlTab(QWidget):
         form = QFormLayout()
 
         self._role_combo = _combo([r.value for r in Role])
+        self._role_combo.setEnabled(False)
         self._action_combo = _combo([a.value for a in Action])
         self._resource_line = _line("e.g. report-2026-01.bin")
         self._resource_line.setText("report-2026-01.bin")
-        self._subject_line = _line("e.g. alice")
-        self._subject_line.setText("alice")
+        self._subject_combo = _combo(self._state.access_ctrl.list_subjects())
+        self._subject_combo.setCurrentText("alice")
+        self._subject_combo.currentTextChanged.connect(self._on_subject_changed)
+        self._dept_lbl = _make_label("—", colour=_C["muted"])
         for lbl_text, w in [
             ("Role:", self._role_combo),
             ("Action:", self._action_combo),
             ("Resource:", self._resource_line),
-            ("Subject:", self._subject_line),
+            ("Subject:", self._subject_combo),
+            ("Department:", self._dept_lbl),
         ]:
             lbl = QLabel(lbl_text)
             lbl.setStyleSheet(f"color: {_C['text']};")
             form.addRow(lbl, w)
         left_v.addLayout(form)
+
+        self._on_subject_changed(self._subject_combo.currentText())
 
         check_btn = _make_button("🔐  Check Access", _C["accent"])
         check_btn.clicked.connect(self._check_access)
@@ -1034,7 +1056,7 @@ class AccessControlTab(QWidget):
         role    = Role(self._role_combo.currentText())
         action  = Action(self._action_combo.currentText())
         resource = self._resource_line.text().strip() or "*"
-        subject  = self._subject_line.text().strip() or "anonymous"
+        subject  = self._subject_combo.currentText().strip() or "anonymous"
         granted  = self._state.access_ctrl.check(role, action, resource, subject)
         colour   = _C["green"] if granted else _C["red"]
         verdict  = "✔  GRANTED" if granted else "✗  DENIED"
@@ -1077,6 +1099,14 @@ class AccessControlTab(QWidget):
             f"Subjects: {s['unique_subjects']}  |  "
             f"Most Denied: {s['most_denied_action'] or '—'}"
         )
+
+    def _on_subject_changed(self, subject: str) -> None:
+        profile = self._state.access_ctrl.get_subject_profile(subject)
+        if profile is None:
+            self._dept_lbl.setText("Unknown")
+            return
+        self._dept_lbl.setText(profile.department)
+        self._role_combo.setCurrentText(profile.role.value)
 
 
 # ===========================================================================
@@ -2188,6 +2218,7 @@ class SentinelWeaveApp(QMainWindow):
 
 def main() -> None:
     app = QApplication(sys.argv)
+    app.setFont(QFont("Bahnschrift", 10))
     app.setApplicationName("SentinelWeave")
     window = SentinelWeaveApp()
     window.show()

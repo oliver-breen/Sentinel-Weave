@@ -199,6 +199,11 @@ class ThreatDetector:
             azure_api_key
             or os.environ.get("SENTINELWEAVE_AZURE_API_KEY")
         )
+        self._use_aad = os.environ.get("SENTINELWEAVE_AZURE_ML_USE_AAD") == "1"
+        self._aad_scope = os.environ.get(
+            "SENTINELWEAVE_AZURE_ML_SCOPE",
+            "https://ml.azure.com/.default",
+        )
 
     # ------------------------------------------------------------------
     # Public API
@@ -260,7 +265,7 @@ class ThreatDetector:
 
         # 4. Optional Azure ML scoring
         azure_score: Optional[float] = None
-        if self._endpoint and self._api_key and event.features:
+        if self._endpoint and (self._api_key or self._use_aad) and event.features:
             azure_score = self._query_azure_ml(event.features)
             if azure_score is not None:
                 explanation.append(f"Azure ML model score: {azure_score:.3f}")
@@ -340,13 +345,22 @@ class ThreatDetector:
             import urllib.request
 
             payload = json.dumps({"input": [features]}).encode()
+            headers = {"Content-Type": "application/json"}
+            if self._api_key:
+                headers["Authorization"] = f"Bearer {self._api_key}"
+            elif self._use_aad:
+                try:
+                    from azure.identity import DefaultAzureCredential  # type: ignore[import]
+                    credential = DefaultAzureCredential()
+                    token = credential.get_token(self._aad_scope).token
+                    headers["Authorization"] = f"Bearer {token}"
+                except Exception:
+                    return None
+
             req = urllib.request.Request(
                 self._endpoint,
                 data=payload,
-                headers={
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {self._api_key}",
-                },
+                headers=headers,
                 method="POST",
             )
             with urllib.request.urlopen(req, timeout=5) as resp:  # noqa: S310

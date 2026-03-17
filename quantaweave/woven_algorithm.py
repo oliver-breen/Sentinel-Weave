@@ -13,7 +13,7 @@ underlying mathematical problems is compromised.
 """
 
 import os
-import pickle
+from .safe_serialize import dumps as safe_dumps, loads as safe_loads
 from typing import Tuple, Any, List, Dict, Optional
 
 from .pq_unified_interface import PQScheme
@@ -62,10 +62,10 @@ class QuantaWeaveAlgorithm(PQScheme):
         """
         pub_keys_list, sec_keys_list = self.hybrid.generate_keypair()
         all_ids = self._kem_ids + self._sig_ids
-        pub_key_blob = pickle.dumps(
+        pub_key_blob = safe_dumps(
             {name: key for name, key in zip(all_ids, pub_keys_list)}
         )
-        sec_key_blob = pickle.dumps(
+        sec_key_blob = safe_dumps(
             {name: key for name, key in zip(all_ids, sec_keys_list)}
         )
         return pub_key_blob, sec_key_blob
@@ -83,7 +83,7 @@ class QuantaWeaveAlgorithm(PQScheme):
             ``{'combined_secret': bytes}``.
         """
         try:
-            pub_key_obj = pickle.loads(public_key)
+            pub_key_obj = safe_loads(public_key)
         except Exception:
             pub_key_obj = public_key
         if isinstance(pub_key_obj, dict):
@@ -104,7 +104,7 @@ class QuantaWeaveAlgorithm(PQScheme):
             dict: ``{'combined_secret': bytes}`` with the recovered shared secret.
         """
         try:
-            sec_key_obj = pickle.loads(secret_key)
+            sec_key_obj = safe_loads(secret_key)
         except Exception:
             sec_key_obj = secret_key
         if isinstance(sec_key_obj, dict):
@@ -158,7 +158,7 @@ class QuantaWeaveAlgorithm(PQScheme):
             bytes: Pickled list of signatures (or raw bytes for single scheme).
         """
         try:
-            sec_key_obj = pickle.loads(secret_key)
+            sec_key_obj = safe_loads(secret_key)
         except Exception:
             sec_key_obj = secret_key
         if isinstance(sec_key_obj, dict):
@@ -169,7 +169,7 @@ class QuantaWeaveAlgorithm(PQScheme):
         else:
             all_sks = [sec_key_obj]
         sigs = self.hybrid.sign(message, all_sks)
-        return sigs[0] if len(sigs) == 1 else pickle.dumps(sigs)
+        return sigs[0] if len(sigs) == 1 else safe_dumps(sigs)
 
     def verify(self, message: bytes, signature: bytes, public_key: bytes) -> bool:
         """Verify *signature* over *message*.
@@ -182,13 +182,13 @@ class QuantaWeaveAlgorithm(PQScheme):
             bool: ``True`` if all signatures are valid.
         """
         try:
-            sigs = pickle.loads(signature)
+            sigs = safe_loads(signature)
             if not isinstance(sigs, list):
                 sigs = [signature]
         except Exception:
             sigs = [signature]
         try:
-            pub_key_obj = pickle.loads(public_key)
+            pub_key_obj = safe_loads(public_key)
         except Exception:
             pub_key_obj = public_key
         if isinstance(pub_key_obj, dict):

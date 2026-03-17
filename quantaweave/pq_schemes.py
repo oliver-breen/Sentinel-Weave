@@ -2,7 +2,7 @@
 from typing import Optional, List, Tuple, Any
 import hashlib
 import os
-import pickle
+from .safe_serialize import dumps as safe_dumps, loads as safe_loads
 from .pq_unified_interface import PQScheme
 
 try:
@@ -124,10 +124,10 @@ class RSAGCMScheme(PQScheme):
     def encapsulate(self, public_key: bytes) -> Tuple[bytes, bytes]:
         secret = os.urandom(32)
         enc_dict = self.rsa.encrypt(secret, public_key)
-        return (pickle.dumps(enc_dict), secret)
+        return (safe_dumps(enc_dict), secret)
 
     def decapsulate(self, ciphertext: bytes, secret_key: bytes) -> bytes:
-        enc_dict = pickle.loads(ciphertext)
+        enc_dict = safe_loads(ciphertext)
         return self.rsa.decrypt(enc_dict, secret_key)
 
     def sign(self, message: bytes, secret_key: bytes) -> bytes:

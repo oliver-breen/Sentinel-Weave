@@ -1,7 +1,7 @@
 """
 ML Pipeline — SentinelWeave
 
-Lightweight supervised learning pipeline for binary threat classification.
+Lightweight supervised learning pipeline for binary Cybersecurity threat classification.
 
 Trains a logistic regression classifier on the 13-element feature vectors
 produced by :class:`~sentinel_weave.event_analyzer.EventAnalyzer`.  No
@@ -1107,7 +1107,7 @@ class SklearnSecurityClassifier:
             self._model = base
             raw_imp = getattr(base, "feature_importances_", [])
             self._importances = [round(float(v), 6) for v in raw_imp]
-            if self.estimator_type == "random_forest":
+            if isinstance(base, RandomForestClassifier):
                 oob_score = round(float(base.oob_score_), 4)
 
         self._trained = True
@@ -1294,18 +1294,14 @@ class SklearnSecurityClassifier:
 
     def to_json(self) -> str:
         """
-        Serialise the model to a JSON string using ``pickle`` under the hood.
+        Serialise the model configuration to a JSON string.
 
-        .. warning::
-            The resulting JSON contains base64-encoded pickle data.  Do not
-            deserialise untrusted payloads.
+        Trained sklearn model state is intentionally not persisted to avoid
+        unsafe deserialisation. Re-train after loading.
 
         Returns:
             JSON string suitable for storage or transport.
         """
-        import pickle  # noqa: PLC0415
-        import base64  # noqa: PLC0415
-
         payload = {
             "class":          "SklearnSecurityClassifier",
             "estimator_type": self.estimator_type,
@@ -1315,11 +1311,8 @@ class SklearnSecurityClassifier:
             "calibrate":      self.calibrate,
             "trained":        self._trained,
             "importances":    self._importances,
-            "model_b64":      (
-                base64.b64encode(pickle.dumps(self._model)).decode()
-                if self._trained
-                else None
-            ),
+            "model_state":    None,
+            "note":           "Model weights are not serialized; re-train after load.",
         }
         return json.dumps(payload)
 
@@ -1338,9 +1331,6 @@ class SklearnSecurityClassifier:
         Raises:
             ValueError: If the JSON is not from a ``SklearnSecurityClassifier``.
         """
-        import pickle   # noqa: PLC0415
-        import base64   # noqa: PLC0415
-
         payload = json.loads(data)
         if payload.get("class") != "SklearnSecurityClassifier":
             raise ValueError("JSON was not produced by SklearnSecurityClassifier.to_json()")
@@ -1351,8 +1341,7 @@ class SklearnSecurityClassifier:
             random_state=payload["random_state"],
             calibrate=payload["calibrate"],
         )
-        obj._trained      = payload["trained"]
+        obj._trained      = False
         obj._importances  = payload["importances"]
-        if payload.get("model_b64") is not None:
-            obj._model = pickle.loads(base64.b64decode(payload["model_b64"]))  # noqa: S301
+        obj._model = None
         return obj

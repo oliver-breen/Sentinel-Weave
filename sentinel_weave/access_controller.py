@@ -123,6 +123,15 @@ class AccessRequest:
         )
 
 
+@dataclass(frozen=True)
+class SubjectProfile:
+    """Authoritative subject profile used to validate role claims."""
+
+    subject: str
+    role: Role
+    department: str
+
+
 # ---------------------------------------------------------------------------
 # AccessController
 # ---------------------------------------------------------------------------
@@ -148,9 +157,25 @@ class AccessController:
             ...
     """
 
-    def __init__(self, audit_enabled: bool = True) -> None:
+    def __init__(
+        self,
+        audit_enabled: bool = True,
+        enforce_subjects: bool = True,
+        subject_profiles: Optional[dict[str, SubjectProfile]] = None,
+    ) -> None:
         self._audit_enabled = audit_enabled
+        self._enforce_subjects = enforce_subjects
         self._log: list[AccessRequest] = []
+        self._subjects: dict[str, SubjectProfile] = (
+            subject_profiles
+            if subject_profiles is not None
+            else {
+                "alice": SubjectProfile("alice", Role.ANALYST, "SOC"),
+                "bob": SubjectProfile("bob", Role.VIEWER, "IT"),
+                "carol": SubjectProfile("carol", Role.RESPONDER, "IR"),
+                "dana": SubjectProfile("dana", Role.ADMIN, "SECOPS"),
+            }
+        )
 
     # ------------------------------------------------------------------
     # Core API
@@ -178,6 +203,20 @@ class AccessController:
         Returns:
             ``True`` if the action is permitted, ``False`` otherwise.
         """
+        profile = self.get_subject_profile(subject)
+        if profile is None:
+            if self._enforce_subjects:
+                reason = "Unknown subject; access denied"
+                self._record(subject, role, action, resource, False, reason)
+                return False
+        elif role != profile.role:
+            reason = (
+                f"Role mismatch for subject {profile.subject!r}: "
+                f"expected {profile.role.value}, got {role.value}"
+            )
+            self._record(subject, role, action, resource, False, reason)
+            return False
+
         allowed_actions = _PERMISSIONS.get(role, frozenset())
         granted = action in allowed_actions
         reason = (
@@ -274,6 +313,15 @@ class AccessController:
             "unique_subjects":     len(subjects),
             "most_denied_action":  most_denied,
         }
+
+    def list_subjects(self) -> list[str]:
+        """Return a sorted list of known subjects."""
+        return sorted(self._subjects.keys())
+
+    def get_subject_profile(self, subject: str) -> Optional[SubjectProfile]:
+        """Return the SubjectProfile for a subject (case-insensitive)."""
+        key = (subject or "").strip().lower()
+        return self._subjects.get(key)
 
     # ------------------------------------------------------------------
     # Private helpers

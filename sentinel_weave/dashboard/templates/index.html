@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SentinelWeave Dashboard</title>
+  <style>
+    @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap");
+
+    :root {
+      --bg: #0f1114;
+      --bg-2: #15191e;
+      --panel: #1b2026;
+      --panel-2: #212831;
+      --border: #2b3138;
+      --text: #e6e2d8;
+      --muted: #8b9097;
+      --accent: #c2a66a;
+      --green: #7fb08a;
+      --yellow: #d3b46a;
+      --orange: #c68c63;
+      --red: #c26b6b;
+      --steel: #0c0f12;
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      --bevel: inset 0 1px 0 rgba(255, 255, 255, 0.04), inset 0 -1px 0 rgba(0, 0, 0, 0.35);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Space Grotesk", system-ui, -apple-system, sans-serif;
+      color: var(--text);
+      background: radial-gradient(circle at 10% 10%, #1b2026 0%, #0f1114 60%);
+      min-height: 100vh;
+    }
+
+    .grid-texture {
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+      opacity: 0.4;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 24px 32px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, var(--panel), var(--bg));
+      box-shadow: var(--shadow);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 20px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    .brand span {
+      font-size: 12px;
+      color: var(--muted);
+      font-family: "IBM Plex Mono", monospace;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: inset 0 0 0 2px rgba(0,0,0,0.2);
+    }
+
+    main {
+      padding: 28px 32px 48px;
+      display: grid;
+      gap: 24px;
+      grid-template-columns: 1.1fr 1.3fr;
+    }
+
+    @media (max-width: 1100px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel {
+      background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .panel::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      box-shadow: var(--bevel);
+      pointer-events: none;
+      border-radius: 14px;
+    }
+
+    .panel h2 {
+      margin: 0 0 16px;
+      font-size: 16px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    .metrics {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    }
+
+    .card {
+      background: linear-gradient(160deg, var(--bg-2), var(--panel));
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+    }
+
+    .card h3 {
+      margin: 0;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+    }
+
+    .card .value {
+      margin-top: 10px;
+      font-size: 26px;
+      font-weight: 600;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-family: "IBM Plex Mono", monospace;
+      color: var(--muted);
+      background: rgba(0,0,0,0.15);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      font-family: "IBM Plex Mono", monospace;
+    }
+
+    th, td {
+      padding: 10px 8px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+
+    th {
+      color: var(--muted);
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+    }
+
+    .severity {
+      font-weight: 600;
+    }
+
+    .severity.BENIGN { color: var(--green); }
+    .severity.LOW { color: var(--accent); }
+    .severity.MEDIUM { color: var(--yellow); }
+    .severity.HIGH { color: var(--orange); }
+    .severity.CRITICAL { color: var(--red); }
+
+    .timeline {
+      display: grid;
+      gap: 10px;
+    }
+
+    .timeline-item {
+      display: grid;
+      gap: 6px;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: rgba(0,0,0,0.18);
+    }
+
+    .timeline-item span {
+      font-family: "IBM Plex Mono", monospace;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .footer {
+      margin-top: 20px;
+      color: var(--muted);
+      font-size: 12px;
+      font-family: "IBM Plex Mono", monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="grid-texture"></div>
+  <header>
+    <div class="brand">
+      <h1>SentinelWeave</h1>
+      <span>Threat Operations Console</span>
+    </div>
+    <div class="status">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="status-text">Local mode</span>
+      <span class="badge" id="tick-rate">live</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h2>System Metrics</h2>
+      <div class="metrics">
+        <div class="card">
+          <h3>Total Events</h3>
+          <div class="value" id="total-events">0</div>
+        </div>
+        <div class="card">
+          <h3>Threats (High+)</h3>
+          <div class="value" id="high-threats">0</div>
+        </div>
+        <div class="card">
+          <h3>Avg Anomaly</h3>
+          <div class="value" id="avg-anomaly">0.000</div>
+        </div>
+        <div class="card">
+          <h3>Emails Scanned</h3>
+          <div class="value" id="emails-scanned">0</div>
+        </div>
+      </div>
+
+      <div class="footer">
+        Updated from live stream. Red-team endpoints require API key if configured.
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Recent Threat Reports</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Source</th>
+            <th>Type</th>
+            <th>Level</th>
+            <th>Score</th>
+          </tr>
+        </thead>
+        <tbody id="event-table"></tbody>
+      </table>
+    </section>
+
+    <section class="panel">
+      <h2>Threat Breakdown</h2>
+      <div class="timeline" id="threat-breakdown"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Top Sources</h2>
+      <div class="timeline" id="top-sources"></div>
+    </section>
+  </main>
+
+  <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+</body>
+</html>
