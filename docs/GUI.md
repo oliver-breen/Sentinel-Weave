@@ -64,4 +64,5 @@ The GUI is organized into two tabs:
 
 ## More Information
 - For advanced usage, see the main README, docs/ALGORITHM.md, and docs/PROOFS.md.
+- For the rebuilt web dashboard, see sentinel_weave/dashboard_web/README.md.
 - For issues, open a ticket on the GitHub repository.

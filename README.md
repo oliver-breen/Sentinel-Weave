@@ -37,6 +37,15 @@ python -m dashboard
 # Then open http://127.0.0.1:5000
 ```
 
+For the rebuilt React dashboard:
+
+```bash
+cd sentinel_weave/dashboard_web
+npm install
+npm run dev
+# Then open http://127.0.0.1:5173
+```
+
 ### Desktop GUI
 
 ```bash
