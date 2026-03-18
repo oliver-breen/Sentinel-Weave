@@ -12,7 +12,7 @@ except ImportError:
     _AESGCM_AVAILABLE = False
 
 # Use the LWE KEM and Falcon signature implementations via the pqcrypto package
-from kyber_dilithium_hqc import (
+from mlkem_mldsa_bridge import (
     kem_keygen,
     kem_encaps,
     kem_decaps,

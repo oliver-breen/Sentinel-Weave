@@ -33,7 +33,7 @@ guide until the C back-end is complete.
 
 ---
 
-## Public API Renames (`kyber_dilithium_hqc.py`)
+## Public API Renames (`mlkem_mldsa_bridge.py`)
 
 | Old function | New function | Description |
 |---|---|---|

@@ -1,10 +1,10 @@
 {
   "lwe_round_trip_level1": {
-    "max_ms": 100.04469999694265,
+    "max_ms": 62.67200000002049,
     "notes": "Level1 LWE encrypt+decrypt"
   },
   "falcon_sign_verify": {
-    "max_ms": 0.9583999999449588,
+    "max_ms": 1.646799995796755,
     "notes": "Falcon-1024 sign+verify"
   }
 }

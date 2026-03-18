@@ -3,7 +3,7 @@ import hashlib
 from .pq_unified_interface import PQScheme
 
 # Use the LWE KEM implementation
-from kyber_dilithium_hqc import (
+from mlkem_mldsa_bridge import (
     kem_keygen,
     kem_encaps,
     kem_decaps,

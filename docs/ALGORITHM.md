@@ -99,7 +99,7 @@ print(plaintext)  # b'Hello'
 Python snippets:
 
 ```python
-from kyber_dilithium_hqc import kem_keygen, kem_encaps, kem_decaps
+from mlkem_mldsa_bridge import kem_keygen, kem_encaps, kem_decaps
 
 public_key, secret_key = kem_keygen()
 ciphertext, shared_secret = kem_encaps(public_key)
@@ -234,7 +234,7 @@ Falcon is a lattice-based signature scheme. The binding exposes Falcon-512 and F
 ### Usage
 
 ```python
-from kyber_dilithium_hqc import kem_keygen, kem_encaps, kem_decaps
+from mlkem_mldsa_bridge import kem_keygen, kem_encaps, kem_decaps
 
 public_key, secret_key = kem_keygen()
 ciphertext, shared_secret = kem_encaps(public_key)
@@ -278,7 +278,7 @@ Potential improvements for future versions:
 - The `encapsulation_decapsulation.py` demo uses RSA-OAEP for key wrapping, which is **not** post-quantum secure. It is provided for hybrid KEM workflow illustration only.
 - Dependencies: the RSA demo requires the `cryptography` package; the LWE core in `quantaweave/` does not.
 - The `key_generation.py` file is a disabled RSA keygen example (wrapped in a docstring).
-- `kyber_dilithium_hqc.py` provides the ML-KEM and ML-DSA Python API (C integration is work in progress).
+- `mlkem_mldsa_bridge.py` provides the ML-KEM and ML-DSA Python API (C integration is work in progress).
 
 ## References
 
