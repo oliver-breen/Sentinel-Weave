@@ -4,7 +4,7 @@ QuantaWeave is a Python implementation of a lattice-based post-quantum cryptogra
 
 ## Overview
 
-This library implements a quantum-resistant encryption scheme designed to be secure against attacks from both classical and quantum computers. The LWE-based encryption is complemented by a code-based HQC Key Encapsulation Mechanism (KEM) for shared-secret establishment and a Falcon signature binding.
+This library implements a quantum-resistant encryption scheme designed to be secure against attacks from both classical and quantum computers. The LWE-based encryption is complemented by an ML-KEM Key Encapsulation Mechanism (KEM) for shared-secret establishment and a Falcon signature binding.
 
 ## Features
 
@@ -13,8 +13,8 @@ This library implements a quantum-resistant encryption scheme designed to be sec
 - **Simple API**: Easy-to-use interface for key generation, encryption, and decryption
 - **Pure Python Core**: No external dependencies for the LWE-based library in `quantaweave/`
 - **Falcon Signatures**: C++ binding for Falcon-512/1024 signatures
-- **Examples Included**: Basic, benchmark, multi-party, HQC KEM, and Falcon signature demos
-- **Well-Tested**: Unit tests for math utilities, key generation, encryption/decryption, and HQC KEM round-trips
+- **Examples Included**: Basic, benchmark, multi-party, and Falcon signature demos
+- **Well-Tested**: Unit tests for math utilities, key generation, and encryption/decryption
 
 ## Algorithm Description
 
@@ -99,12 +99,11 @@ print(plaintext)  # b'Hello'
 Python snippets:
 
 ```python
-from quantaweave import QuantaWeave
+from kyber_dilithium_hqc import kem_keygen, kem_encaps, kem_decaps
 
-pqc = QuantaWeave(security_level="LEVEL3")
-public_key, private_key = pqc.hqc_keypair()
-ciphertext, shared_secret = pqc.hqc_encapsulate(public_key)
-recovered = pqc.hqc_decapsulate(ciphertext, private_key)
+public_key, secret_key = kem_keygen()
+ciphertext, shared_secret = kem_encaps(public_key)
+recovered = kem_decaps(ciphertext, secret_key)
 assert recovered == shared_secret
 ```
 
@@ -130,9 +129,6 @@ python examples/benchmark.py
 # Multi-party messaging demo
 python examples/multi_party.py
 
-# HQC KEM demo
-python examples/hqc_kem_usage.py
-
 # Falcon signature demo (requires GMP + C++ build)
 python examples/falcon_signature.py
 ```
@@ -143,7 +139,6 @@ python examples/falcon_signature.py
 # Run all tests
 python -m unittest tests/test_quantaweave.py
 python -m unittest tests/test_kem_tests.py
-python -m unittest tests/test_hqc_kem.py
 python -m unittest tests/test_falcon_sig.py
 
 # Run specific test class
@@ -166,9 +161,6 @@ Main interface for the cryptography system.
 - `encrypt(message, public_key)`: Encrypt a message
 - `decrypt(ciphertext, private_key)`: Decrypt a ciphertext
 - `get_security_level()`: Get security level in bits
-- `hqc_keypair()`: Generate HQC KEM keypair
-- `hqc_encapsulate(public_key)`: Encapsulate shared secret with HQC
-- `hqc_decapsulate(ciphertext, private_key)`: Decapsulate HQC ciphertext
 
 ### FalconSig Class
 
@@ -235,10 +227,6 @@ Handles ciphertext decryption.
 
 Use `examples/benchmark.py` to measure performance on your hardware. The `results_v2.md` file contains a baseline template with sample data only.
 
-## HQC KEM
-
-HQC is a code-based KEM used to establish shared secrets (not direct message encryption). The implementation includes parameter sets HQC-1/3/5.
-
 ## Falcon Signatures
 
 Falcon is a lattice-based signature scheme. The binding exposes Falcon-512 and Falcon-1024 key generation, signing, and verification, using the vendor C++ implementation. Building the extension requires GMP, pybind11, and a C++20 compiler.
@@ -246,24 +234,14 @@ Falcon is a lattice-based signature scheme. The binding exposes Falcon-512 and F
 ### Usage
 
 ```python
-from quantaweave import QuantaWeave
+from kyber_dilithium_hqc import kem_keygen, kem_encaps, kem_decaps
 
-pqc = QuantaWeave(security_level='LEVEL1')
-public_key, private_key = pqc.hqc_keypair()
-
-ciphertext, shared_secret = pqc.hqc_encapsulate(public_key)
-recovered_secret = pqc.hqc_decapsulate(ciphertext, private_key)
+public_key, secret_key = kem_keygen()
+ciphertext, shared_secret = kem_encaps(public_key)
+recovered_secret = kem_decaps(ciphertext, secret_key)
 
 assert shared_secret == recovered_secret
 ```
-
-### Sizes (bytes)
-
-| HQC Variant | Public Key | Private Key | Ciphertext | Shared Secret |
-|-------------|------------|-------------|------------|---------------|
-| HQC-1 | 2241 | 2321 | 4433 | 32 |
-| HQC-3 | 4514 | 4602 | 8978 | 32 |
-| HQC-5 | 7237 | 7333 | 14421 | 32 |
 
 ## Implementation Details
 
@@ -300,7 +278,7 @@ Potential improvements for future versions:
 - The `encapsulation_decapsulation.py` demo uses RSA-OAEP for key wrapping, which is **not** post-quantum secure. It is provided for hybrid KEM workflow illustration only.
 - Dependencies: the RSA demo requires the `cryptography` package; the LWE core in `quantaweave/` does not.
 - The `key_generation.py` file is a disabled RSA keygen example (wrapped in a docstring).
-- `kyber_dilithium_hqc.py` provides the LWE KEM and Falcon signature Python API (C integration is work in progress).
+- `kyber_dilithium_hqc.py` provides the ML-KEM and ML-DSA Python API (C integration is work in progress).
 
 ## References
 

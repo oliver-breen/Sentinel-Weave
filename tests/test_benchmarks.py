@@ -1,5 +1,5 @@
 """
-Optional benchmark tests for LWE and HQC flows.
+Optional benchmark tests for LWE and Falcon flows.
 
 Enable with RUN_BENCHMARKS=1. Use BENCHMARK_USE_BASELINE=1 to
 enforce per-test thresholds from tests/benchmarks_baseline.json.
@@ -11,6 +11,7 @@ import time
 import unittest
 
 from quantaweave import QuantaWeave
+from quantaweave.falcon import FalconSig
 
 RUN_BENCHMARKS = os.getenv("RUN_BENCHMARKS") == "1"
 MAX_MS = float(os.getenv("BENCHMARK_MAX_MS", "0"))
@@ -64,40 +65,18 @@ class TestBenchmarks(unittest.TestCase):
         _assert_with_baseline(self, "lwe_round_trip_level1", elapsed_ms)
 
     @unittest.skipUnless(RUN_BENCHMARKS, "Set RUN_BENCHMARKS=1 to enable benchmarks")
-    def test_hqc_round_trip_timing_level1(self):
-        pqc = QuantaWeave("LEVEL1")
+    def test_falcon_sign_verify_timing(self):
+        falcon = FalconSig("Falcon-1024")
+        public_key, private_key = falcon.keygen()
+        message = b"benchmark"
+
         start = time.perf_counter()
-        public_key, private_key = pqc.hqc_keypair()
-        ciphertext, shared_secret = pqc.hqc_encapsulate(public_key)
-        recovered = pqc.hqc_decapsulate(ciphertext, private_key)
+        signature = falcon.sign(private_key, message)
+        valid = falcon.verify(public_key, message, signature)
         elapsed_ms = (time.perf_counter() - start) * 1000
 
-        self.assertEqual(shared_secret, recovered)
-        _assert_with_baseline(self, "hqc_round_trip_level1", elapsed_ms)
-
-    @unittest.skipUnless(RUN_BENCHMARKS, "Set RUN_BENCHMARKS=1 to enable benchmarks")
-    def test_hqc_round_trip_timing_level3(self):
-        pqc = QuantaWeave("LEVEL3")
-        start = time.perf_counter()
-        public_key, private_key = pqc.hqc_keypair()
-        ciphertext, shared_secret = pqc.hqc_encapsulate(public_key)
-        recovered = pqc.hqc_decapsulate(ciphertext, private_key)
-        elapsed_ms = (time.perf_counter() - start) * 1000
-
-        self.assertEqual(shared_secret, recovered)
-        _assert_with_baseline(self, "hqc_round_trip_level3", elapsed_ms)
-
-    @unittest.skipUnless(RUN_BENCHMARKS, "Set RUN_BENCHMARKS=1 to enable benchmarks")
-    def test_hqc_round_trip_timing_level5(self):
-        pqc = QuantaWeave("LEVEL5")
-        start = time.perf_counter()
-        public_key, private_key = pqc.hqc_keypair()
-        ciphertext, shared_secret = pqc.hqc_encapsulate(public_key)
-        recovered = pqc.hqc_decapsulate(ciphertext, private_key)
-        elapsed_ms = (time.perf_counter() - start) * 1000
-
-        self.assertEqual(shared_secret, recovered)
-        _assert_with_baseline(self, "hqc_round_trip_level5", elapsed_ms)
+        self.assertTrue(valid)
+        _assert_with_baseline(self, "falcon_sign_verify", elapsed_ms)
 
 
 if __name__ == "__main__":

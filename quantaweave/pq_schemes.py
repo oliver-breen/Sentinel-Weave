@@ -12,61 +12,53 @@ except ImportError:
     _AESGCM_AVAILABLE = False
 
 # Use the LWE KEM and Falcon signature implementations via the pqcrypto package
-from kyber_dilithium_hqc import kem_keygen, kem_encaps, kem_decaps
-
-# Use the real HQC implementation
-from quantaweave.hqc.parameters import get_parameters
-from quantaweave.hqc.kem import hqc_kem_keypair, hqc_kem_encaps, hqc_kem_decaps
+from kyber_dilithium_hqc import (
+    kem_keygen,
+    kem_encaps,
+    kem_decaps,
+    sig_keygen,
+    sig_sign,
+    sig_verify,
+)
 
 from .falcon import FalconSig
 from .rsa_gcm import RSAGCM
 
 
 class LWEKEMScheme(PQScheme):
-    def __init__(self):
+    def __init__(self, kem_alg: str = "ML-KEM-512"):
+        self.kem_alg = kem_alg
         self.pk = None
         self.sk = None
 
     def generate_keypair(self) -> Tuple[bytes, bytes]:
-        result = kem_keygen()
-        pk = result['public_key']
-        sk = result['secret_key']
+        result = kem_keygen(self.kem_alg)
+        if isinstance(result, dict):
+            pk = result.get("public_key")
+            sk = result.get("secret_key")
+        else:
+            pk, sk = result
+        if pk is None or sk is None:
+            raise ValueError("ML-KEM key generation failed.")
         self.pk = pk
         self.sk = sk
         return pk, sk
 
     def encapsulate(self, public_key: bytes) -> Tuple[bytes, bytes]:
-        result = kem_encaps(public_key)
-        return result['ciphertext'], result['shared_secret']
+        result = kem_encaps(public_key, self.kem_alg)
+        if isinstance(result, dict):
+            return result["ciphertext"], result["shared_secret"]
+        ciphertext, shared_secret = result
+        return ciphertext, shared_secret
 
     def decapsulate(self, ciphertext: bytes, secret_key: bytes) -> bytes:
-        return kem_decaps(ciphertext, secret_key)
+        return kem_decaps(ciphertext, secret_key, self.kem_alg)
 
     def sign(self, message: bytes, secret_key: bytes) -> bytes:
         raise NotImplementedError("LWE KEM does not support signatures.")
 
     def verify(self, message: bytes, signature: bytes, public_key: bytes) -> bool:
         raise NotImplementedError("LWE KEM does not support signatures.")
-
-
-class HQCScheme(PQScheme):
-    def __init__(self, param_set: str = "HQC-1"):
-        self.params = get_parameters(param_set)
-
-    def generate_keypair(self) -> Tuple[bytes, bytes]:
-        return hqc_kem_keypair(self.params)
-
-    def encapsulate(self, public_key: bytes) -> Tuple[bytes, bytes]:
-        return hqc_kem_encaps(self.params, public_key)
-
-    def decapsulate(self, ciphertext: bytes, secret_key: bytes) -> bytes:
-        return hqc_kem_decaps(self.params, ciphertext, secret_key)
-
-    def sign(self, message: bytes, secret_key: bytes) -> bytes:
-        raise NotImplementedError("HQC does not support signatures.")
-
-    def verify(self, message: bytes, signature: bytes, public_key: bytes) -> bool:
-        raise NotImplementedError("HQC does not support signatures.")
 
 
 class FalconScheme(PQScheme):
@@ -112,6 +104,32 @@ class FalconSignatureScheme(PQScheme):
             return self._falcon.verify(public_key, message, signature)
         except Exception:
             return False
+
+
+class MLDSASignatureScheme(PQScheme):
+    """ML-DSA backed lattice signature scheme."""
+
+    def __init__(self, sig_alg: str = "ML-DSA-44"):
+        self.sig_alg = sig_alg
+
+    def generate_keypair(self) -> Tuple[bytes, bytes]:
+        return sig_keygen(self.sig_alg)
+
+    def encapsulate(self, public_key: bytes) -> Tuple[bytes, bytes]:
+        raise NotImplementedError("ML-DSA does not support KEM.")
+
+    def decapsulate(self, ciphertext: bytes, secret_key: bytes) -> bytes:
+        raise NotImplementedError("ML-DSA does not support KEM.")
+
+    def sign(self, message: bytes, secret_key: bytes) -> bytes:
+        if isinstance(secret_key, str):
+            secret_key = secret_key.encode()
+        return sig_sign(secret_key, message, self.sig_alg)
+
+    def verify(self, message: bytes, signature: bytes, public_key: bytes) -> bool:
+        if isinstance(public_key, str):
+            public_key = public_key.encode()
+        return sig_verify(public_key, message, signature, self.sig_alg)
 
 
 class RSAGCMScheme(PQScheme):
@@ -170,12 +188,12 @@ class UnifiedPQHybrid(PQScheme):
     def _get_scheme_id(self, scheme):
         if isinstance(scheme, LWEKEMScheme):
             return "LWE-KEM"
-        elif isinstance(scheme, HQCScheme):
-            return "HQC"
         elif isinstance(scheme, FalconScheme):
             return "Falcon"
         elif isinstance(scheme, FalconSignatureScheme):
             return "FalconSig"
+        elif isinstance(scheme, MLDSASignatureScheme):
+            return "ML-DSA"
         elif isinstance(scheme, RSAGCMScheme):
             return "RSA-GCM"
         else:

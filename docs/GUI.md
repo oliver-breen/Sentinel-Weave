@@ -1,6 +1,6 @@
 # QuantaWeave GUI User Guide
 
-The QuantaWeave GUI provides a user-friendly interface for post-quantum cryptography operations, including LWE encryption, HQC KEM, and Falcon signatures. This guide explains how to install, launch, and use the GUI for common cryptographic tasks.
+The QuantaWeave GUI provides a user-friendly interface for post-quantum cryptography operations, including LWE encryption and Falcon signatures. This guide explains how to install, launch, and use the GUI for common cryptographic tasks.
 
 ## Installation
 
@@ -26,7 +26,7 @@ The QuantaWeave GUI provides a user-friendly interface for post-quantum cryptogr
 
 ## Main Features
 
-The GUI is organized into three tabs:
+The GUI is organized into two tabs:
 
 ### 1. LWE Tab
 - **Security Level:** Choose LEVEL1, LEVEL3, or LEVEL5.
@@ -34,13 +34,7 @@ The GUI is organized into three tabs:
 - **Encrypt:** Enter a message and public key, click Encrypt to produce ciphertext.
 - **Decrypt:** Enter ciphertext and private key, click Decrypt to recover the message.
 
-### 2. HQC KEM Tab
-- **Security Level & Encoding:** Select security level and output encoding (hex/base64).
-- **Keypair:** Generate HQC public/private keys.
-- **Encapsulate:** Use public key to generate ciphertext and shared secret.
-- **Decapsulate:** Use ciphertext and private key to recover the shared secret.
-
-### 3. Falcon Tab
+### 2. Falcon Tab
 - **Parameter Set:** Choose Falcon-512 or Falcon-1024.
 - **Keypair:** Generate Falcon public/secret keys.
 - **Sign:** Sign a message with the secret key.
@@ -54,14 +48,6 @@ The GUI is organized into three tabs:
 4. Enter your message in the Message box.
 5. Click **Encrypt**. The ciphertext will appear.
 6. To decrypt, paste the ciphertext and private key, then click **Decrypt**. The original message will be shown.
-
-## Step-by-Step Example: HQC KEM
-
-1. Go to the **HQC KEM** tab.
-2. Select security level and encoding.
-3. Click **Generate Keypair**.
-4. Click **Encapsulate** to generate ciphertext and shared secret.
-5. To decapsulate, paste the ciphertext and private key, then click **Decapsulate**. The recovered secret will be shown.
 
 ## Step-by-Step Example: Falcon Sign/Verify
 

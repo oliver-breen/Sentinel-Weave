@@ -1,11 +1,10 @@
 import pytest
-from quantaweave.pq_schemes import LWEKEMScheme, FalconSignatureScheme, HQCScheme, UnifiedPQHybrid
+from quantaweave.pq_schemes import LWEKEMScheme, FalconSignatureScheme, UnifiedPQHybrid
 
 def test_hybrid_kem_and_signature():
     lwe = LWEKEMScheme()
-    hqc = HQCScheme(param_set="HQC-1")
     falcon_sig = FalconSignatureScheme()
-    hybrid = UnifiedPQHybrid(kem_schemes=[lwe, hqc], sig_schemes=[falcon_sig])
+    hybrid = UnifiedPQHybrid(kem_schemes=[lwe], sig_schemes=[falcon_sig])
 
     pub_keys, sec_keys = hybrid.generate_keypair()
     # Ensure all keys are bytes

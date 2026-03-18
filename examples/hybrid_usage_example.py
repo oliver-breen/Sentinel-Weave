@@ -1,13 +1,12 @@
-from quantaweave.pq_schemes import LWEKEMScheme, FalconSignatureScheme, HQCScheme, UnifiedPQHybrid
+from quantaweave.pq_schemes import LWEKEMScheme, FalconSignatureScheme, UnifiedPQHybrid
 
 def main():
     # Instantiate individual schemes
     lwe = LWEKEMScheme()
-    hqc = HQCScheme(param_set="HQC-1")
     falcon_sig = FalconSignatureScheme()
 
-    # Create a hybrid: LWE KEM + HQC for KEM, Falcon for signature
-    hybrid = UnifiedPQHybrid(kem_schemes=[lwe, hqc], sig_schemes=[falcon_sig])
+    # Create a hybrid: LWE KEM for KEM, Falcon for signature
+    hybrid = UnifiedPQHybrid(kem_schemes=[lwe], sig_schemes=[falcon_sig])
 
     # Key generation
     pub_keys, sec_keys = hybrid.generate_keypair()

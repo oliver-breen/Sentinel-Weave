@@ -3,26 +3,33 @@ import hashlib
 from .pq_unified_interface import PQScheme
 
 # Use the LWE KEM implementation
-from kyber_dilithium_hqc import kem_keygen, kem_encaps, kem_decaps
+from kyber_dilithium_hqc import (
+    kem_keygen,
+    kem_encaps,
+    kem_decaps,
+    sig_keygen,
+    sig_sign,
+    sig_verify,
+)
 
 class LWEKEMScheme(PQScheme):
-    def __init__(self):
-        pass
+    def __init__(self, kem_alg: str = "ML-KEM-512"):
+        self.kem_alg = kem_alg
 
     def generate_keypair(self) -> Tuple[Any, Any]:
-        return kem_keygen()
+        return kem_keygen(self.kem_alg)
 
     def encapsulate(self, public_key: Any) -> Tuple[Any, Any]:
         if isinstance(public_key, str):
             public_key = public_key.encode()
-        return kem_encaps(public_key)
+        return kem_encaps(public_key, self.kem_alg)
 
     def decapsulate(self, ciphertext: Any, secret_key: Any) -> Any:
         if isinstance(ciphertext, str):
             ciphertext = ciphertext.encode()
         if isinstance(secret_key, str):
             secret_key = secret_key.encode()
-        return kem_decaps(ciphertext, secret_key)
+        return kem_decaps(ciphertext, secret_key, self.kem_alg)
 
     def sign(self, message: bytes, secret_key: Any) -> Any:
         raise NotImplementedError("LWE KEM does not support signatures.")
@@ -31,8 +38,36 @@ class LWEKEMScheme(PQScheme):
         raise NotImplementedError("LWE KEM does not support signatures.")
 
 
-# Use the Falcon signature implementation
-from kyber_dilithium_hqc import sig_keygen, sig_sign, sig_verify
+# Use the ML-DSA signature implementation
+class MLDSASignatureScheme(PQScheme):
+    def __init__(self, sig_alg: str = "ML-DSA-44"):
+        self.sig_alg = sig_alg
+
+    def generate_keypair(self) -> Tuple[Any, Any]:
+        return sig_keygen(self.sig_alg)
+
+    def encapsulate(self, public_key: Any) -> Tuple[Any, Any]:
+        raise NotImplementedError("ML-DSA does not support KEM.")
+
+    def decapsulate(self, ciphertext: Any, secret_key: Any) -> Any:
+        raise NotImplementedError("ML-DSA does not support KEM.")
+
+    def sign(self, message: bytes, secret_key: Any) -> Any:
+        if isinstance(secret_key, str):
+            secret_key = secret_key.encode()
+        if isinstance(message, str):
+            message = message.encode()
+        return sig_sign(secret_key, message, self.sig_alg)
+
+    def verify(self, message: bytes, signature: Any, public_key: Any) -> bool:
+        if isinstance(public_key, str):
+            public_key = public_key.encode()
+        if isinstance(message, str):
+            message = message.encode()
+        if isinstance(signature, str):
+            signature = signature.encode()
+        return sig_verify(public_key, message, signature, self.sig_alg)
+
 
 class FalconSignatureScheme(PQScheme):
     def __init__(self):
@@ -62,32 +97,6 @@ class FalconSignatureScheme(PQScheme):
         if isinstance(signature, str):
             signature = signature.encode()
         return sig_verify(public_key, message, signature)
-
-
-# Use the real HQC implementation
-from quantaweave.hqc.parameters import get_parameters
-from quantaweave.hqc.kem import hqc_kem_keypair, hqc_kem_encaps, hqc_kem_decaps
-
-class HQCScheme(PQScheme):
-    def __init__(self, param_set: str = "HQC-1"):
-        self.params = get_parameters(param_set)
-
-    def generate_keypair(self) -> Tuple[Any, Any]:
-        return hqc_kem_keypair(self.params)
-
-    def encapsulate(self, public_key: Any) -> Tuple[Any, Any]:
-        return hqc_kem_encaps(self.params, public_key)
-
-    def decapsulate(self, ciphertext: Any, secret_key: Any) -> Any:
-        return hqc_kem_decaps(self.params, ciphertext, secret_key)
-
-    def sign(self, message: bytes, secret_key: Any) -> Any:
-        # HQC does not support signatures
-        raise NotImplementedError("HQC does not support signatures.")
-
-    def verify(self, message: bytes, signature: Any, public_key: Any) -> bool:
-        # HQC does not support signatures
-        raise NotImplementedError("HQC does not support signatures.")
 
 
 # Use the Falcon implementation (or mock/backend)

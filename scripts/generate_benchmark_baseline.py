@@ -1,5 +1,5 @@
 """
-Generate benchmark baseline JSON by timing LWE and HQC round-trips.
+Generate benchmark baseline JSON by timing LWE and Falcon operations.
 """
 
 import json
@@ -10,6 +10,7 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from quantaweave import QuantaWeave
+from quantaweave.falcon import FalconSig
 
 
 def _time_lwe_level1() -> float:
@@ -25,15 +26,16 @@ def _time_lwe_level1() -> float:
     return elapsed_ms
 
 
-def _time_hqc(level: str) -> float:
-    pqc = QuantaWeave(level)
+def _time_falcon_sign_verify() -> float:
+    falcon = FalconSig("Falcon-1024")
+    public_key, private_key = falcon.keygen()
+    message = b"benchmark"
     start = time.perf_counter()
-    public_key, private_key = pqc.hqc_keypair()
-    ciphertext, shared_secret = pqc.hqc_encapsulate(public_key)
-    recovered = pqc.hqc_decapsulate(ciphertext, private_key)
+    signature = falcon.sign(private_key, message)
+    valid = falcon.verify(public_key, message, signature)
     elapsed_ms = (time.perf_counter() - start) * 1000
-    if recovered != shared_secret:
-        raise RuntimeError(f"HQC round-trip failed for {level}")
+    if not valid:
+        raise RuntimeError("Falcon sign/verify failed")
     return elapsed_ms
 
 
@@ -43,17 +45,9 @@ def main() -> None:
             "max_ms": _time_lwe_level1(),
             "notes": "Level1 LWE encrypt+decrypt",
         },
-        "hqc_round_trip_level1": {
-            "max_ms": _time_hqc("LEVEL1"),
-            "notes": "HQC-1 KEM encaps+decaps",
-        },
-        "hqc_round_trip_level3": {
-            "max_ms": _time_hqc("LEVEL3"),
-            "notes": "HQC-3 KEM encaps+decaps",
-        },
-        "hqc_round_trip_level5": {
-            "max_ms": _time_hqc("LEVEL5"),
-            "notes": "HQC-5 KEM encaps+decaps",
+        "falcon_sign_verify": {
+            "max_ms": _time_falcon_sign_verify(),
+            "notes": "Falcon-1024 sign+verify",
         },
     }
 

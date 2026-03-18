@@ -7,8 +7,6 @@ Provides a simple interface for key generation, encryption, and decryption.
 from typing import Tuple, Dict
 from .keygen import KeyGenerator
 from .encryption import Encryptor, Decryptor
-from .hqc import get_parameters as get_hqc_parameters
-from .hqc import hqc_kem_keypair, hqc_kem_encaps, hqc_kem_decaps
 
 
 class QuantaWeave:
@@ -96,48 +94,3 @@ class QuantaWeave:
         """
         return self.keygen.get_security_level()
 
-    def hqc_keypair(self):
-        """
-        Generate an HQC KEM keypair.
-
-        Returns:
-            Tuple of (public_key, private_key) as bytes
-        """
-        params = self._get_hqc_params()
-        return hqc_kem_keypair(params)
-
-    def hqc_encapsulate(self, public_key: bytes):
-        """
-        Encapsulate a shared secret using HQC.
-
-        Args:
-            public_key: HQC public key bytes from hqc_keypair()
-
-        Returns:
-            Tuple of (ciphertext, shared_secret) as bytes
-        """
-        params = self._get_hqc_params()
-        return hqc_kem_encaps(params, public_key)
-
-    def hqc_decapsulate(self, ciphertext: bytes, private_key: bytes) -> bytes:
-        """
-        Decapsulate an HQC ciphertext to recover the shared secret.
-
-        Args:
-            ciphertext: HQC ciphertext from hqc_encapsulate()
-            private_key: HQC private key bytes from hqc_keypair()
-
-        Returns:
-            Shared secret as bytes
-        """
-        params = self._get_hqc_params()
-        return hqc_kem_decaps(params, ciphertext, private_key)
-
-    def _get_hqc_params(self):
-        level_map = {
-            "LEVEL1": "HQC-1",
-            "LEVEL3": "HQC-3",
-            "LEVEL5": "HQC-5",
-        }
-        hqc_name = level_map.get(self.security_level, "HQC-1")
-        return get_hqc_parameters(hqc_name)

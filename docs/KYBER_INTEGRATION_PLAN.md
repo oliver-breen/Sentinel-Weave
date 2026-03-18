@@ -7,9 +7,8 @@ This document describes the current state and future plans for the Key Encapsula
 ## Current State
 
 - **LWE KEM**: Pure-Python educational implementation in `quantaweave/lwe_kem_core.py` using the Learning With Errors (LWE) problem
-- **HQC KEM**: Code-based KEM in `quantaweave/hqc/` (Hamming Quasi-Cyclic)
 - **Falcon Signatures**: Lattice-based signatures via a C++ binding in `quantaweave/falcon.py`
-- **`kyber_dilithium_hqc.py`**: Python API module exposing `kem_keygen`, `kem_encaps`, `kem_decaps`, `sig_keygen`, `sig_sign`, `sig_verify`
+- **`kyber_dilithium_hqc.py`**: ML-KEM/ML-DSA API module exposing `kem_keygen`, `kem_encaps`, `kem_decaps`, `sig_keygen`, `sig_sign`, `sig_verify`
 
 ## Planned C Integration
 

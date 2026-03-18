@@ -4,7 +4,7 @@ from quantaweave.woven_algorithm import QuantaWeaveAlgorithm
 
 class TestQuantaWeaveAlgorithm(unittest.TestCase):
     """
-    Test suite for the Woven Algorithm (LWE-KEM + HQC + Falcon).
+    Test suite for the Woven Algorithm (LWE-KEM + Falcon).
     """
 
     def setUp(self):
@@ -29,7 +29,7 @@ class TestQuantaWeaveAlgorithm(unittest.TestCase):
         self.assertGreater(len(sk), 0)
 
     def test_encapsulation_decapsulation(self):
-        """Test hybrid KEM functionality (LWE-KEM + HQC)."""
+        """Test hybrid KEM functionality (LWE-KEM)."""
         pk, sk = self.algo.generate_keypair()
         ct, ss = self.algo.encapsulate(pk)
         self.assertIsInstance(ct, dict)

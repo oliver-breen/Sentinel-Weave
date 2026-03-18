@@ -10,14 +10,13 @@ This repository is an educational implementation. Use it as a reference and appl
 
 ## API Stability
 
-- Public API: `QuantaWeave` methods and HQC KEM helpers exported from `quantaweave`.
+- Public API: `QuantaWeave` methods and Falcon signatures exported from `quantaweave`.
 - Deprecation policy: maintain backward compatibility for one minor release before removal.
 - Breaking changes require a version bump and changelog entry.
 
 ## Security Hardening
 
 - Prefer constant-time implementations for sensitive code paths.
-- Avoid branching on HQC decapsulation failures.
 - Use secure key storage and rotation.
 - Validate input sizes and enforce strict parsing.
 - Validate Azure environment configuration before deployment.

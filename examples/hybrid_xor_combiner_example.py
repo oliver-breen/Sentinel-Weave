@@ -4,7 +4,7 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from quantaweave.pq_schemes import LWEKEMScheme, HQCScheme, UnifiedPQHybrid
+from quantaweave.pq_schemes import LWEKEMScheme, UnifiedPQHybrid
 import hashlib
 
 def xor_combiner(secrets):
@@ -19,9 +19,8 @@ def xor_combiner(secrets):
 
 def main():
     lwe = LWEKEMScheme()
-    hqc = HQCScheme(param_set="HQC-1")
     # Use XOR as the secret combiner
-    hybrid = UnifiedPQHybrid(kem_schemes=[lwe, hqc], secret_combiner=xor_combiner)
+    hybrid = UnifiedPQHybrid(kem_schemes=[lwe], secret_combiner=xor_combiner)
 
     pub_keys, sec_keys = hybrid.generate_keypair()
     ciphertexts, shared_secret = hybrid.encapsulate(pub_keys)

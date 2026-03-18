@@ -112,10 +112,10 @@ class TestPQCKeypairBundle(unittest.TestCase):
         """The algorithm field is embedded in the stored JSON bundle."""
         import json
         import base64
-        store_pqc_keypair(self.vault, "alg-test", b"pk", b"sk", algorithm="HQC-128")
+        store_pqc_keypair(self.vault, "alg-test", b"pk", b"sk", algorithm="FALCON-1024")
         raw = self.vault.retrieve_key("alg-test")
         bundle = json.loads(raw.decode("utf-8"))
-        self.assertEqual(bundle["algorithm"], "HQC-128")
+        self.assertEqual(bundle["algorithm"], "FALCON-1024")
 
 
 # ---------------------------------------------------------------------------

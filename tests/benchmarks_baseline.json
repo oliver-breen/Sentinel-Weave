@@ -1,18 +1,10 @@
 {
   "lwe_round_trip_level1": {
-    "max_ms": 26.722499999777938,
+    "max_ms": 100.04469999694265,
     "notes": "Level1 LWE encrypt+decrypt"
   },
-  "hqc_round_trip_level1": {
-    "max_ms": 64.17220000002999,
-    "notes": "HQC-1 KEM encaps+decaps"
-  },
-  "hqc_round_trip_level3": {
-    "max_ms": 206.50350000005346,
-    "notes": "HQC-3 KEM encaps+decaps"
-  },
-  "hqc_round_trip_level5": {
-    "max_ms": 1617.589100000032,
-    "notes": "HQC-5 KEM encaps+decaps"
+  "falcon_sign_verify": {
+    "max_ms": 0.9583999999449588,
+    "notes": "Falcon-1024 sign+verify"
   }
 }

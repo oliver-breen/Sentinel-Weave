@@ -11,7 +11,6 @@ __author__ = "Oliver Breen"
 from .core import QuantaWeave
 from .keygen import KeyGenerator
 from .encryption import Encryptor, Decryptor
-from .hqc import hqc_kem_keypair, hqc_kem_encaps, hqc_kem_decaps
 from .falcon import FalconSig
 
 __all__ = [
@@ -19,8 +18,5 @@ __all__ = [
 	'KeyGenerator',
 	'Encryptor',
 	'Decryptor',
-	'hqc_kem_keypair',
-	'hqc_kem_encaps',
-	'hqc_kem_decaps',
 	'FalconSig',
 ]
