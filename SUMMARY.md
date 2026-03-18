@@ -4,7 +4,7 @@
 
 ### Overview
 
-This project implements a post-quantum cryptographic system based on the **Learning With Errors (LWE)** problem, plus a code-based HQC KEM implementation and supporting demos/documentation.
+This project implements a post-quantum cryptographic system based on the **Learning With Errors (LWE)** problem, plus ML-KEM/ML-DSA and Falcon bindings with supporting demos/documentation.
 
 ### What Was Developed
 
@@ -34,10 +34,6 @@ This project implements a post-quantum cryptographic system based on the **Learn
 - Simple, user-friendly interface
 - Unified QuantaWeave class for all operations
 
-**HQC KEM** (`quantaweave/hqc/`):
-- Code-based HQC KEM primitives (HQC-1/3/5)
-- PKE/KEM flow with parsing, symmetric primitives, and codecs
-
 **Falcon Signatures** (`falcon.py`, `_falcon_bindings.cpp`):
 - C++ binding for Falcon-512/1024 signatures
 - Requires GMP and a C++20 compiler during build
@@ -51,14 +47,11 @@ This project implements a post-quantum cryptographic system based on the **Learn
 **KEM Placeholder** (`test_kem_tests.py`):
 - Contains placeholder tests for future KEM encapsulation/decapsulation work
 
-**HQC KEM Tests** (`test_hqc_kem.py`):
-- Round-trip tests for HQC-1, HQC-3, and HQC-5
-
 **Falcon Signature Tests** (`test_falcon_sig.py`):
 - Sign/verify round-trip checks for Falcon-1024
 
 **Benchmark Tests** (`test_benchmarks.py`):
-- Optional performance checks for LWE and HQC (disabled by default)
+- Optional performance checks for LWE and Falcon (disabled by default)
  - Baseline thresholds in `benchmarks_baseline.json`
 
 #### 3. Examples (`examples/`)
@@ -74,9 +67,6 @@ This project implements a post-quantum cryptographic system based on the **Learn
 **Multi-Party Communication** (`multi_party.py`):
 - Demonstrates secure communication between multiple parties
 - Shows Alice and Bob exchanging encrypted messages
-
-**HQC KEM Demo** (`hqc_kem_usage.py`):
-- Demonstrates HQC key generation, encapsulation, and decapsulation
 
 **Falcon Signature Demo** (`falcon_signature.py`):
 - Demonstrates Falcon keygen, sign, and verify
@@ -99,6 +89,9 @@ This project implements a post-quantum cryptographic system based on the **Learn
 - Production recommendations
 - Comparison with other PQC schemes
 
+**Proof Sketches** (`docs/PROOFS.md`):
+- Formal reduction outlines and assumptions
+
 **README** (`README.md`):
 - Project overview
 - Quick start guide
@@ -117,7 +110,7 @@ This project implements a post-quantum cryptographic system based on the **Learn
 ✅ **Quantum-Resistant**: Based on lattice problems hard for quantum computers  
 ✅ **Multiple Security Levels**: 128, 192, and 256-bit security options  
 ✅ **Pure Python Core**: No external dependencies for the LWE-based library  
-✅ **Well-Tested**: Unit tests for LWE and HQC KEM round-trips  
+✅ **Well-Tested**: Unit tests for LWE and Falcon sign/verify  
 ✅ **Documented**: Extensive documentation and examples  
 ✅ **Educational**: Clear code with detailed explanations  
 
@@ -141,7 +134,6 @@ Command-line:
 python examples/basic_usage.py
 python examples/benchmark.py
 python examples/multi_party.py
-python examples/hqc_kem_usage.py
 python examples/falcon_signature.py
 python gui/quantaweave_gui.py
 ```
@@ -151,10 +143,11 @@ Python snippets:
 ```python
 from quantaweave import QuantaWeave
 
-pqc = QuantaWeave(security_level="LEVEL3")
-public_key, private_key = pqc.hqc_keypair()
-ciphertext, shared_secret = pqc.hqc_encapsulate(public_key)
-recovered = pqc.hqc_decapsulate(ciphertext, private_key)
+from mlkem_mldsa_bridge import kem_keygen, kem_encaps, kem_decaps
+
+public_key, secret_key = kem_keygen()
+ciphertext, shared_secret = kem_encaps(public_key)
+recovered = kem_decaps(ciphertext, secret_key)
 assert recovered == shared_secret
 ```
 
@@ -185,7 +178,6 @@ assert falcon.verify(public_key, message, signature)
 ├── tests/
 │   ├── test_quantaweave.py         # Core unit tests
 │   └── test_kem_tests.py        # KEM placeholder tests
-│   └── test_hqc_kem.py           # HQC KEM tests
 │   └── test_falcon_sig.py         # Falcon signature tests
 │   └── test_benchmarks.py         # Optional benchmark tests
 │   └── benchmarks_baseline.json    # Benchmark regression baseline
@@ -193,11 +185,11 @@ assert falcon.verify(public_key, message, signature)
 │   ├── basic_usage.py           # Basic demonstration
 │   ├── benchmark.py             # Performance benchmarks
 │   └── multi_party.py           # Multi-party example
-│   └── hqc_kem_usage.py          # HQC KEM example
 │   └── falcon_signature.py        # Falcon signature example
 ├── encapsulation_decapsulation.py  # RSA-OAEP key wrap demo (classical)
 ├── key_generation.py               # RSA key generation demo (disabled by default)
-├── kyber_dilithium_hqc.py          # LWE KEM and Falcon signature API
+├── mlkem_mldsa_bridge.py           # ML-KEM/ML-DSA bridge API
+├── kyber_dilithium_hqc.py          # Deprecated compatibility stub
 ├── results_v2.md                   # Baseline KEM test template
 ├── pyproject.toml                  # Packaging metadata
 ├── CHANGELOG.md                    # Release notes
@@ -205,6 +197,7 @@ assert falcon.verify(public_key, message, signature)
 └── docs/
     ├── ALGORITHM.md             # Algorithm documentation
     └── SECURITY.md              # Security analysis
+    └── PROOFS.md                # Formal proof sketches
     └── PRODUCTION.md            # Production guidance
     └── RELEASE.md               # Release process
 ```

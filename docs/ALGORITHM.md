@@ -6,6 +6,8 @@ QuantaWeave is a Python implementation of a lattice-based post-quantum cryptogra
 
 This library implements a quantum-resistant encryption scheme designed to be secure against attacks from both classical and quantum computers. The LWE-based encryption is complemented by an ML-KEM Key Encapsulation Mechanism (KEM) for shared-secret establishment and a Falcon signature binding.
 
+For formal proof sketches and reduction outlines, see [docs/PROOFS.md](PROOFS.md).
+
 ## Features
 
 - **Quantum-Resistant**: Based on lattice problems that are hard for quantum computers

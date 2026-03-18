@@ -63,5 +63,5 @@ The GUI is organized into two tabs:
 - If the GUI does not launch, try running from a terminal to see error messages.
 
 ## More Information
-- For advanced usage, see the main README and docs/ALGORITHM.md.
+- For advanced usage, see the main README, docs/ALGORITHM.md, and docs/PROOFS.md.
 - For issues, open a ticket on the GitHub repository.

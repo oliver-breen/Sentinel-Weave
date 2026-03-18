@@ -52,6 +52,7 @@ __version__ = "0.4.0"
 __author__  = "Oliver Breen"
 
 from .event_analyzer      import EventAnalyzer, SecurityEvent, analyze_log_file
+from quantaweave import QuantaWeave
 from .threat_detector     import ThreatDetector, ThreatReport, ThreatLevel, summarize_reports
 from .azure_config import AzureConfig
 from .azure_integration   import (
@@ -117,6 +118,8 @@ __all__ = [
     "EventAnalyzer",
     "SecurityEvent",
     "analyze_log_file",
+    # QuantaWeave PQC
+    "QuantaWeave",
     # Capstone-backed shellcode detection
     "detect_shellcode",
     # YARA-backed log-line analyzer

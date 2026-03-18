@@ -10,10 +10,13 @@ This document provides a security analysis of the QuantaWeave implementation.
 - The `encapsulation_decapsulation.py` demo uses RSA-OAEP for key wrapping, which is **not** post-quantum secure, and requires the `cryptography` package.
 - The `key_generation.py` file is a disabled RSA keygen example (wrapped in a docstring).
 - `mlkem_mldsa_bridge.py` provides the ML-KEM and ML-DSA Python API (C integration is work in progress).
+- `mlkem_mldsa_bridge.py` provides the ML-KEM and ML-DSA Python API (C integration is work in progress).
 - `results_v2.md` is a baseline template with sample data, not verified benchmarks.
 - Falcon signatures are provided via a C++ binding and require GMP at build/runtime.
 
 ## Threat Model
+
+For formal proof sketches and reduction outlines, see [docs/PROOFS.md](PROOFS.md).
 
 ### Classical Attackers
 - **Computational Power**: Limited to polynomial-time classical algorithms

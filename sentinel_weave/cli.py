@@ -10,6 +10,12 @@ report      Generate and store an encrypted threat report from a log file.
 decrypt     Retrieve and decrypt a stored threat report.
 demo        Run a built-in demonstration with synthetic log lines.
 
+Notes
+-----
+QuantaWeave provides the post-quantum cryptography layer used by SecureReporter
+(LWE + ML-KEM/ML-DSA + Falcon). See docs/ALGORITHM.md and docs/PROOFS.md for
+details.
+
 Usage
 -----
 ::
@@ -410,6 +416,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="sentinel_weave",
         description="SentinelWeave — AI-powered cybersecurity threat detection with post-quantum encryption",
+        epilog=(
+            "QuantaWeave provides the post-quantum cryptography layer used by SecureReporter "
+            "(LWE + ML-KEM/ML-DSA + Falcon). See docs/ALGORITHM.md and docs/PROOFS.md."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     sub = parser.add_subparsers(dest="command")
 

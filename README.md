@@ -1,6 +1,6 @@
 # SentinelWeave
 
-SentinelWeave is an AI-powered cybersecurity threat detection platform with post-quantum secure reporting. It combines log parsing, anomaly detection, ML classification, and optional Azure integrations, then wraps sensitive reports in hybrid PQ + AES encryption.
+SentinelWeave is an AI-powered cybersecurity threat detection platform with post-quantum secure reporting. It combines log parsing, anomaly detection, ML classification, and optional Azure integrations, then wraps sensitive reports using QuantaWeave (LWE + ML-KEM/ML-DSA + Falcon) with AES-GCM.
 
 ## Highlights
 
@@ -11,6 +11,7 @@ SentinelWeave is an AI-powered cybersecurity threat detection platform with post
 - Web dashboard (Flask + Chart.js) with live SSE updates.
 - PyQt6 GUI with 8 tabs including Email Scanner and ML Pipeline.
 - Azure integrations with offline-safe fallbacks.
+- QuantaWeave PQC primitives with formal proof sketches.
 
 ## Quick Start
 
@@ -47,7 +48,7 @@ python gui/sentinel_weave_gui.py
 
 ```
 Raw Logs -> EventAnalyzer -> ThreatDetector -> ThreatReport
-									-> SecureReporter -> PQ + AES encrypted report
+									-> SecureReporter -> QuantaWeave PQ + AES encrypted report
 									-> SIEM Export (CEF / LEEF)
 									-> Azure Integrations (optional)
 ```
@@ -128,6 +129,7 @@ For the full roadmap and legacy HQC build notes, see [sentinel_weave/TODO.md](se
 - Project overview: [sentinel_weave/SENTINEL_WEAVE.md](sentinel_weave/SENTINEL_WEAVE.md)
 - GUI guide: [docs/GUI.md](docs/GUI.md)
 - Algorithm notes: [docs/ALGORITHM.md](docs/ALGORITHM.md)
+- Proof sketches: [docs/PROOFS.md](docs/PROOFS.md)
 - Security: [SECURITY.md](SECURITY.md)
 
 ## Tests
