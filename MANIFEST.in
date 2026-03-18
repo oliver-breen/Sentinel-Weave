@@ -1,5 +1,0 @@
-include vendor/falcon/LICENSE
-include vendor/falcon/include/*.hpp
-include vendor/hqc/lib/fips202/fips202.c
-include vendor/hqc/lib/fips202/fips202.h
-include sentinel_weave/py.typed
