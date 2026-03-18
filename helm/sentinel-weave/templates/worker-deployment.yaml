@@ -1,26 +1,22 @@
+{{- if .Values.worker.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "sentinel-weave.fullname" . }}
+  name: {{ include "sentinel-weave.fullname" . }}-worker
   labels:
     {{- include "sentinel-weave.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
 spec:
-  {{- if not .Values.autoscaling.enabled }}
-  replicas: {{ .Values.replicaCount }}
-  {{- end }}
+  replicas: {{ .Values.worker.replicaCount }}
   selector:
     matchLabels:
       {{- include "sentinel-weave.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: dashboard
+      app.kubernetes.io/component: worker
   template:
     metadata:
-      {{- with .Values.podAnnotations }}
-      annotations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
       labels:
         {{- include "sentinel-weave.selectorLabels" . | nindent 8 }}
-        app.kubernetes.io/component: dashboard
+        app.kubernetes.io/component: worker
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -30,22 +26,20 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-        - name: {{ .Chart.Name }}
+        - name: worker
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          ports:
-            - name: http
-              containerPort: 5000
-              protocol: TCP
+          image: "{{ .Values.worker.image.repository | default .Values.image.repository }}:{{ .Values.worker.image.tag | default .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.worker.image.pullPolicy | default .Values.image.pullPolicy }}
+          command:
+            {{- toYaml .Values.worker.command | nindent 12 }}
+          args:
+            {{- toYaml .Values.worker.args | nindent 12 }}
           env:
-            # -- Non-secret runtime settings --------------------------------
             {{- range $k, $v := .Values.env }}
             - name: {{ $k }}
               value: {{ $v | quote }}
             {{- end }}
-            # -- Azure credentials from Helm values -------------------------
             {{- if and (not .Values.existingSecret) .Values.azure.storageConnectionString }}
             - name: AZURE_STORAGE_CONNECTION_STRING
               valueFrom:
@@ -62,7 +56,6 @@ spec:
                   key: AZURE_TEXT_ANALYTICS_KEY
                   optional: true
             {{- end }}
-            # -- Azure credentials from pre-existing secret -----------------
             {{- if .Values.existingSecret }}
             - name: AZURE_STORAGE_CONNECTION_STRING
               valueFrom:
@@ -101,23 +94,8 @@ spec:
                   key: SENTINELWEAVE_AZURE_API_KEY
                   optional: true
             {{- end }}
-          livenessProbe:
-            {{- toYaml .Values.livenessProbe | nindent 12 }}
-          readinessProbe:
-            {{- toYaml .Values.readinessProbe | nindent 12 }}
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
-          {{- if .Values.persistence.enabled }}
-          volumeMounts:
-            - name: data
-              mountPath: {{ .Values.persistence.mountPath }}
-          {{- end }}
-      {{- if .Values.persistence.enabled }}
-      volumes:
-        - name: data
-          persistentVolumeClaim:
-            claimName: {{ include "sentinel-weave.fullname" . }}
-      {{- end }}
+            {{- toYaml .Values.worker.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -130,3 +108,5 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+{{- end }}
+

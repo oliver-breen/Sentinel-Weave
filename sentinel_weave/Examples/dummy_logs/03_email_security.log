@@ -1,0 +1,8 @@
+2026-03-03T07:30:14 INFO mailgw: message_id=<M-1001@example.org> from=alerts@trusted-vendor.com to=soc@corp.local verdict=clean
+2026-03-03T07:34:10 WARNING mailgw: message_id=<M-1002@example.org> from=security-review@micr0soft-secure.co to=finance@corp.local verdict=review
+2026-03-03T07:34:11 WARNING email-scanner: phishing_keywords matched="verify your account; click here immediately"
+2026-03-03T07:34:11 WARNING email-scanner: suspicious_url domain=bit.ly expanded_host=login-security-check.example
+2026-03-03T07:34:11 ERROR email-scanner: html_obfuscation matched="display:none; font-size:0"
+2026-03-03T07:34:12 ALERT email-scanner: attachment_flagged filename=invoice_update.zip reason=suspicious_extension
+2026-03-03T07:34:12 CRITICAL mailgw: message_id=<M-1002@example.org> disposition=quarantined risk_score=0.94 threat_level=CRITICAL
+2026-03-03T07:35:44 NOTICE soc: phishing simulation campaign bucket=Q1-2026 detector=email_scanner

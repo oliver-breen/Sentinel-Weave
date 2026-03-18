@@ -28,6 +28,16 @@ This repository is an educational implementation. Use it as a reference and appl
 - Unit tests
 - Benchmarks with baseline thresholds
 
+## Deploy Checklist
+
+- Set `SENTINELWEAVE_API_KEY` and rotate it regularly.
+- Validate ingress/TLS termination and restrict the dashboard to trusted networks.
+- Run the full CI suite (lint, mypy, unit tests, benchmarks).
+- Build the dashboard UI (`npm run build` in `sentinel_weave/dashboard_web`).
+- Verify `/health` returns `status=ok` and `version` is correct.
+- Confirm rate limits and input size limits match your threat model.
+- Back up secrets and document recovery steps.
+
 ## Performance Targets
 
 - Benchmarks are gated against `tests/benchmarks_baseline.json` with a tolerance factor.

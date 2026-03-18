@@ -1,0 +1,9 @@
+2026-03-08T16:45:00 INFO redteam: authorized_assessment engagement=RT-2026-Q1 target=staging.corp.local
+2026-03-08T16:45:18 NOTICE scanner: tcp_scan completed host=10.20.9.44 open_ports=22,80,443,8443
+2026-03-08T16:45:39 WARNING scanner: vuln_pattern matched service=nginx finding=CVE-2023-44487 confidence=0.72
+2026-03-08T16:46:04 INFO shellcode-analyzer: sample_id=SC-1002 dangerous_mnemonics=syscall,int confidence=0.88
+2026-03-08T16:46:29 ALERT yara: rule=Suspicious_PowerShell_Download matched file=payload_sample.ps1
+2026-03-08T16:46:54 WARNING anomaly-detector: isolation_forest outlier=true score=0.83 record_id=scan-221
+2026-03-08T16:47:22 NOTICE binary-auditor: mitigations nx=true pie=true canary=false relro=partial
+2026-03-08T16:47:51 HIGH memory-forensics: suspected_injection process=winword.exe pid=4412 network_conn=198.51.100.33:443
+2026-03-08T16:48:10 INFO redteam: findings exported format=json analyst=rt-operator-03

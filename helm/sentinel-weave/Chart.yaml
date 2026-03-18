@@ -2,8 +2,7 @@ apiVersion: v2
 name: sentinel-weave
 description: >
   AI-powered cybersecurity threat detection with post-quantum secure reporting.
-  Deploys the SentinelWeave dashboard, threat-detection engine, federated
-  threat-intel hub, and threat-hunting query API.
+  Deploys the SentinelWeave dashboard and background threat-analysis worker.
 type: application
 version: 0.1.0
 appVersion: "0.4.0"

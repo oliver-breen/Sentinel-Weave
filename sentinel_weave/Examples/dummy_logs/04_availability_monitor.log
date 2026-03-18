@@ -1,0 +1,9 @@
+2026-03-04T11:00:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=18
+2026-03-04T11:00:03 INFO availability: heartbeat service=siem-exporter status=ok latency_ms=25
+2026-03-04T11:00:10 WARNING rate-limiter: subject=198.51.100.44 allowed=false retry_after_seconds=0.20 tokens=0.00
+2026-03-04T11:00:11 WARNING rate-limiter: subject=198.51.100.44 allowed=false retry_after_seconds=0.18 tokens=0.00
+2026-03-04T11:00:19 ALERT availability: RATE_EXCEEDED subject=198.51.100.44 current_rate=212.40 threshold=200.00
+2026-03-04T11:00:26 HIGH availability: BURST_DETECTED subject=ingest-api current_rate=418.10 threshold=300.00
+2026-03-04T11:00:41 CRITICAL availability: SERVICE_DOWN subject=dashboard-api last_heartbeat_age_seconds=46.2 threshold=30.0
+2026-03-04T11:00:49 NOTICE oncall: incident=INC-2026-0342 acknowledged component=dashboard-api
+2026-03-04T11:01:02 INFO availability: heartbeat service=dashboard-api status=recovered latency_ms=41

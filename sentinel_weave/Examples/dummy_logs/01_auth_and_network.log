@@ -1,0 +1,10 @@
+2026-03-01T08:15:11 INFO sshd[4121]: Accepted publickey for analyst from 10.20.4.18 port 53112 ssh2
+2026-03-01T08:16:02 WARNING sshd[4127]: Failed password for root from 185.199.110.12 port 50221 ssh2
+2026-03-01T08:16:08 WARNING sshd[4129]: Failed password for admin from 185.199.110.12 port 50229 ssh2
+2026-03-01T08:16:14 ERROR sshd[4132]: Failed password for root from 185.199.110.12 port 50243 ssh2
+2026-03-01T08:17:10 INFO firewall: src=10.20.4.18 dst=10.20.5.22 proto=tcp dpt=443 action=allow
+2026-03-01T08:17:25 ALERT firewall: src=185.199.110.12 dst=10.20.5.22 proto=tcp dpt=22 action=blocked reason=policy
+2026-03-01T08:17:51 CRITICAL ids: nmap scan detected from 185.199.110.12 against 10.20.5.0/24
+2026-03-01T08:18:06 WARNING kernel: SYN flood indicator on interface eth0 src=185.199.110.12
+2026-03-01T08:18:44 NOTICE auth: sudo session opened for user ops by analyst(uid=1001)
+2026-03-01T08:19:12 INFO auth: password policy check completed for user analyst result=pass

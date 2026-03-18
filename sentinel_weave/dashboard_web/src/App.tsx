@@ -100,7 +100,7 @@ export default function App() {
   const [yaraCustom, setYaraCustom] = useState("");
   const [yaraResult, setYaraResult] = useState<string | null>(null);
   const [yaraData, setYaraData] = useState<any | null>(null);
-  const [anomalyJson, setAnomalyJson] = useState("[");
+  const [anomalyJson, setAnomalyJson] = useState("[]");
   const [anomalyResult, setAnomalyResult] = useState<string | null>(null);
   const [anomalyData, setAnomalyData] = useState<any | null>(null);
   const [qwLevel, setQwLevel] = useState("LEVEL1");
@@ -309,12 +309,13 @@ export default function App() {
     value
       .split(",")
       .map((part) => Number(part.trim()))
-      .filter((num) => Number.isFinite(num));
+      .filter((num) => Number.isFinite(num) && num >= 1 && num <= 65535);
 
   const parsePortRange = (value: string): [number, number] | undefined => {
     const parts = value.split("-").map((part) => Number(part.trim()));
     if (parts.length !== 2) return undefined;
     if (!Number.isFinite(parts[0]) || !Number.isFinite(parts[1])) return undefined;
+    if (parts[0] < 1 || parts[1] > 65535 || parts[0] > parts[1]) return undefined;
     return [parts[0], parts[1]];
   };
 
@@ -332,6 +333,28 @@ export default function App() {
       return null;
     }
   };
+
+  const logValid = logInput.trim().length > 0 && logInput.length <= 4096;
+  const emailValid = emailInput.trim().length > 0 && emailInput.length <= 200000;
+  const imapValid = Boolean(imapConfig.host && imapConfig.username && imapConfig.password);
+  const portscanValid = Boolean(portscan.host.trim());
+  const vulnValid = Boolean(vulnBanner.trim());
+  const credsValid = Boolean(credsInput.trim());
+  const reconValid = Boolean(reconTarget.trim());
+  const shellcodeValid = Boolean(shellcodeHex.trim());
+  const yaraValid = Boolean(yaraHex.trim() || yaraText.trim());
+  const anomalyValid = Boolean(anomalyJson.trim());
+  const qwMessageValid = qwMessage.length > 0 && new TextEncoder().encode(qwMessage).length <= 1024;
+  const qwKeyValid = Boolean(qwPublicKey.trim());
+  const qwCipherValid = Boolean(qwCiphertext.trim());
+  const qwPrivValid = Boolean(qwPrivateKey.trim());
+  const mlkemPkValid = Boolean(mlkemPk.trim());
+  const mlkemSkValid = Boolean(mlkemSk.trim());
+  const mlkemCtValid = Boolean(mlkemCt.trim());
+  const mldsaPkValid = Boolean(mldsaPk.trim());
+  const mldsaSkValid = Boolean(mldsaSk.trim());
+  const mldsaSigValid = Boolean(mldsaSig.trim());
+  const mldsaMsgValid = Boolean(mldsaMessage.trim());
 
   const toHex = (b64: string) => {
     try {
@@ -603,9 +626,11 @@ export default function App() {
                   if (!result) return;
                   setLogResult(JSON.stringify(result, null, 2));
                 }}
+                disabled={!logValid}
               >
                 Ingest log
               </button>
+              <p className="hint">Max 4,096 characters. Required.</p>
               {logResult ? <pre className="result">{logResult}</pre> : null}
             </div>
           </Panel>
@@ -639,9 +664,11 @@ export default function App() {
                   if (!result) return;
                   setEmailResult(JSON.stringify(result, null, 2));
                 }}
+                disabled={!emailValid}
               >
                 Scan email
               </button>
+              <p className="hint">Max 200k characters. Required.</p>
               {emailResult ? <pre className="result">{emailResult}</pre> : null}
             </div>
           </Panel>
@@ -705,9 +732,11 @@ export default function App() {
                   setImapResult(JSON.stringify(result, null, 2));
                   setImapRows(Array.isArray(result?.results) ? result.results : []);
                 }}
+                disabled={!imapValid}
               >
                 Scan inbox
               </button>
+              <p className="hint">Host, username, and password are required.</p>
               {imapResult ? <pre className="result">{imapResult}</pre> : null}
             </div>
           </Panel>
@@ -806,9 +835,11 @@ export default function App() {
                   if (!result) return;
                   setPortscanResult(JSON.stringify(result, null, 2));
                 }}
+                disabled={!portscanValid}
               >
                 Run scan
               </button>
+              <p className="hint">Ports must be 1-65535.</p>
               {portscanResult ? <pre className="result">{portscanResult}</pre> : null}
             </div>
           </Panel>
@@ -828,6 +859,7 @@ export default function App() {
                   if (!result) return;
                   setVulnResult(JSON.stringify(result, null, 2));
                 }}
+                disabled={!vulnValid}
               >
                 Assess banner
               </button>
@@ -850,6 +882,7 @@ export default function App() {
                   if (!result) return;
                   setCredsResult(JSON.stringify(result, null, 2));
                 }}
+                disabled={!credsValid}
               >
                 Audit credentials
               </button>
@@ -881,6 +914,7 @@ export default function App() {
                   if (!result) return;
                   setReconResult(JSON.stringify(result, null, 2));
                 }}
+                disabled={!reconValid}
               >
                 Run recon
               </button>
@@ -920,6 +954,7 @@ export default function App() {
                   setShellcodeResult(JSON.stringify(result, null, 2));
                   setShellcodeData(result);
                 }}
+                disabled={!shellcodeValid}
               >
                 Analyze shellcode
               </button>
@@ -991,6 +1026,7 @@ export default function App() {
                   setYaraResult(JSON.stringify(result, null, 2));
                   setYaraData(result);
                 }}
+                disabled={!yaraValid}
               >
                 Run YARA scan
               </button>
@@ -1038,6 +1074,7 @@ export default function App() {
                     setAnomalyData(null);
                   }
                 }}
+                disabled={!anomalyValid}
               >
                 Run anomaly detection
               </button>
@@ -1078,6 +1115,17 @@ export default function App() {
 
       {activeTab === "quantaweave" ? (
         <section className="grid">
+          <Panel title="API key" subtitle="Required if backend API key is enabled">
+            <div className="form-grid">
+              <label>API key</label>
+              <input
+                type="password"
+                value={apiKey}
+                onChange={(event) => setApiKey(event.target.value)}
+                placeholder="Optional"
+              />
+            </div>
+          </Panel>
           <Panel title="QuantaWeave cryptography" subtitle="Hybrid PQ + AES-GCM">
             <div className="list">
               <div>LWE PKE for classical lattice security</div>
@@ -1111,7 +1159,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={async () => {
-                  const result = await runRequest(() => quantaweaveKeygen(qwLevel));
+                  const result = await runRequest(() => quantaweaveKeygen(qwLevel, { apiKey }));
                   if (!result) return;
                   if (result?.error) {
                     setQwStatus(result.error);
@@ -1135,6 +1183,9 @@ export default function App() {
                 value={qwPublicKey}
                 onChange={(event) => setQwPublicKey(event.target.value)}
               />
+              <div className="field-actions">
+                <button type="button" onClick={() => copyText(qwPublicKey)}>Copy</button>
+              </div>
               <label>Message (UTF-8)</label>
               <textarea
                 rows={3}
@@ -1149,7 +1200,7 @@ export default function App() {
                   const result = await runRequest(() => quantaweaveEncrypt({
                     message: qwMessage,
                     public_key: pk,
-                  }));
+                  }, { apiKey }));
                   if (!result) return;
                   if (result?.error) {
                     setQwStatus(result.error);
@@ -1158,9 +1209,11 @@ export default function App() {
                   setQwCiphertext(JSON.stringify(result.ciphertext, null, 2));
                   setQwStatus("Encrypted message.");
                 }}
+                disabled={!qwKeyValid || !qwMessageValid}
               >
                 Encrypt
               </button>
+              <p className="hint">Message max 1,024 bytes. Public key JSON required.</p>
             </div>
           </Panel>
           <Panel title="Decrypt" subtitle="Decrypt ciphertext with a private key">
@@ -1171,12 +1224,18 @@ export default function App() {
                 value={qwPrivateKey}
                 onChange={(event) => setQwPrivateKey(event.target.value)}
               />
+              <div className="field-actions">
+                <button type="button" onClick={() => copyText(qwPrivateKey)}>Copy</button>
+              </div>
               <label>Ciphertext (JSON)</label>
               <textarea
                 rows={6}
                 value={qwCiphertext}
                 onChange={(event) => setQwCiphertext(event.target.value)}
               />
+              <div className="field-actions">
+                <button type="button" onClick={() => copyText(qwCiphertext)}>Copy</button>
+              </div>
               <button
                 type="button"
                 onClick={async () => {
@@ -1186,7 +1245,7 @@ export default function App() {
                   const result = await runRequest(() => quantaweaveDecrypt({
                     private_key: sk,
                     ciphertext: ct,
-                  }));
+                  }, { apiKey }));
                   if (!result) return;
                   if (result?.error) {
                     setQwStatus(result.error);
@@ -1195,6 +1254,7 @@ export default function App() {
                   setQwPlaintext(result.plaintext ?? "");
                   setQwStatus("Decrypted message.");
                 }}
+                disabled={!qwPrivValid || !qwCipherValid}
               >
                 Decrypt
               </button>
@@ -1214,7 +1274,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={async () => {
-                  const result = await runRequest(() => mlkemKeygen(mlkemAlg));
+                  const result = await runRequest(() => mlkemKeygen(mlkemAlg, { apiKey }));
                   if (!result) return;
                   if (result?.error) {
                     setQwStatus(result.error);
@@ -1251,7 +1311,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={async () => {
-                  const result = await runRequest(() => mlkemEncaps({ alg: mlkemAlg, public_key_b64: mlkemPk }));
+                  const result = await runRequest(() => mlkemEncaps({ alg: mlkemAlg, public_key_b64: mlkemPk }, { apiKey }));
                   if (!result) return;
                   if (result?.error) {
                     setQwStatus(result.error);
@@ -1260,6 +1320,7 @@ export default function App() {
                   setMlkemCt(result.ciphertext_b64 ?? "");
                   setMlkemSs(result.shared_secret_b64 ?? "");
                 }}
+                disabled={!mlkemPkValid}
               >
                 Encapsulate
               </button>
@@ -1298,7 +1359,7 @@ export default function App() {
                     alg: mlkemAlg,
                     ciphertext_b64: mlkemCt,
                     secret_key_b64: mlkemSk,
-                  }));
+                  }, { apiKey }));
                   if (!result) return;
                   if (result?.error) {
                     setQwStatus(result.error);
@@ -1306,6 +1367,7 @@ export default function App() {
                   }
                   setMlkemSs(result.shared_secret_b64 ?? "");
                 }}
+                disabled={!mlkemCtValid || !mlkemSkValid}
               >
                 Decapsulate
               </button>
@@ -1330,7 +1392,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={async () => {
-                  const result = await runRequest(() => mldsaKeygen(mldsaAlg));
+                  const result = await runRequest(() => mldsaKeygen(mldsaAlg, { apiKey }));
                   if (!result) return;
                   if (result?.error) {
                     setQwStatus(result.error);
@@ -1373,7 +1435,7 @@ export default function App() {
                     alg: mldsaAlg,
                     secret_key_b64: mldsaSk,
                     message: mldsaMessage,
-                  }));
+                  }, { apiKey }));
                   if (!result) return;
                   if (result?.error) {
                     setQwStatus(result.error);
@@ -1381,6 +1443,7 @@ export default function App() {
                   }
                   setMldsaSig(result.signature_b64 ?? "");
                 }}
+                disabled={!mldsaSkValid || !mldsaMsgValid}
               >
                 Sign message
               </button>
@@ -1416,7 +1479,7 @@ export default function App() {
                     public_key_b64: mldsaPk,
                     signature_b64: mldsaSig,
                     message: mldsaMessage,
-                  }));
+                  }, { apiKey }));
                   if (!result) return;
                   if (result?.error) {
                     setQwStatus(result.error);
@@ -1424,6 +1487,7 @@ export default function App() {
                   }
                   setMldsaValid(result.valid ? "valid" : "invalid");
                 }}
+                disabled={!mldsaPkValid || !mldsaSigValid || !mldsaMsgValid}
               >
                 Verify signature
               </button>

@@ -63,6 +63,7 @@ from PyQt6.QtGui import (
 from sentinel_weave.event_analyzer import EventAnalyzer, SecurityEvent
 from sentinel_weave.threat_detector import ThreatDetector, ThreatReport, ThreatLevel
 from sentinel_weave.threat_correlator import ThreatCorrelator, AttackCampaign
+from sentinel_weave.threat_query import ThreatQueryEngine, dsl_to_query
 from sentinel_weave.ml_pipeline import (
     SecurityClassifier, DatasetBuilder, LabeledEvent,
     evaluate_classifier, k_fold_cross_validate,
@@ -622,6 +623,7 @@ class ThreatDetectionTab(QWidget):
     def __init__(self, state: AppState) -> None:
         super().__init__()
         self._state = state
+        self._view_reports: list[ThreatReport] = []
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -638,6 +640,19 @@ class ThreatDetectionTab(QWidget):
         top_row.addWidget(corr_btn)
         top_row.addStretch()
         root.addLayout(top_row)
+
+        hunt_row = QHBoxLayout()
+        self._hunt_input = _line("Threat hunt DSL (e.g. level:HIGH src:192.168.* sig:SSH_BRUTE_FORCE)")
+        self._hunt_status = _make_label("", colour=_C["muted"])
+        hunt_btn = _make_button("🎯  Hunt", _C["accent"])
+        clear_hunt_btn = _make_button("✖  Clear Hunt", _C["muted"])
+        hunt_btn.clicked.connect(self._run_hunt)
+        clear_hunt_btn.clicked.connect(self._clear_hunt)
+        hunt_row.addWidget(self._hunt_input, 1)
+        hunt_row.addWidget(hunt_btn)
+        hunt_row.addWidget(clear_hunt_btn)
+        root.addLayout(hunt_row)
+        root.addWidget(self._hunt_status)
 
         splitter = QSplitter(Qt.Orientation.Vertical)
         root.addWidget(splitter)
@@ -696,8 +711,12 @@ class ThreatDetectionTab(QWidget):
         splitter.setSizes([300, 400])
 
     def refresh(self) -> None:
+        self._view_reports = list(self._state.reports)
+        self._populate_report_table(self._view_reports)
+
+    def _populate_report_table(self, reports: list[ThreatReport]) -> None:
         self._rep_table.setRowCount(0)
-        for i, rep in enumerate(self._state.reports):
+        for i, rep in enumerate(reports):
             colour = _THREAT_COLOUR[rep.threat_level]
             sigs   = ", ".join(rep.event.matched_sigs) or "—"
             expl   = rep.explanation[0] if rep.explanation else "—"
@@ -711,6 +730,31 @@ class ThreatDetectionTab(QWidget):
                  expl],
                 row_colour=colour,
             )
+
+    def _run_hunt(self) -> None:
+        dsl = self._hunt_input.text().strip()
+        if not dsl:
+            self._clear_hunt()
+            return
+        engine = ThreatQueryEngine(self._state.reports)
+        query = dsl_to_query(dsl)
+        try:
+            matches = engine.query(query)
+        except ValueError as exc:
+            self._hunt_status.setText(f"✖ Query error: {exc}")
+            self._hunt_status.setStyleSheet(f"color: {_C['red']};")
+            return
+        self._view_reports = matches
+        self._populate_report_table(matches)
+        self._hunt_status.setText(f"✔ Hunt matched {len(matches)} / {len(self._state.reports)} reports")
+        self._hunt_status.setStyleSheet(f"color: {_C['muted']};")
+
+    def _clear_hunt(self) -> None:
+        self._hunt_input.clear()
+        self._hunt_status.setText("")
+        self._hunt_status.setStyleSheet(f"color: {_C['muted']};")
+        self._view_reports = list(self._state.reports)
+        self._populate_report_table(self._view_reports)
 
     def _correlate(self) -> None:
         s = self._state
@@ -729,9 +773,9 @@ class ThreatDetectionTab(QWidget):
             )
 
     def _on_row_selected(self, row: int) -> None:
-        if row < 0 or row >= len(self._state.reports):
+        if row < 0 or row >= len(self._view_reports):
             return
-        rep = self._state.reports[row]
+        rep = self._view_reports[row]
         z   = rep.z_scores if rep.z_scores else [0.0] * 13
         for i, (_, pb) in enumerate(self._score_bars):
             val = int(z[i] * 10) if i < len(z) else 0

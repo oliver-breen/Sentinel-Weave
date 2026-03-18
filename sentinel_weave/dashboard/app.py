@@ -89,6 +89,13 @@ from sentinel_weave.federated_intel import FederatedIntelHub
 _MAX_EVENTS = 500        # cap on stored ThreatReports
 _MAX_EMAIL  = 200        # cap on stored EmailScanResults
 _TICK_SECS  = 2.0        # how often the background simulator fires (demo mode)
+_MAX_LOG_LEN = 4096
+_MAX_EMAIL_LEN = 200_000
+_MAX_MESSAGE_LEN = 1024
+_MAX_B64_LEN = 100_000
+_MAX_RULES_LEN = 50_000
+_RATE_LIMITS: dict[str, deque[float]] = {}
+_RATE_LOCK = threading.Lock()
 
 
 @dataclass
@@ -265,6 +272,22 @@ def _b64d(text: str) -> bytes:
     return base64.b64decode(text.encode("ascii"))
 
 
+def _rate_limit(key: str, max_calls: int, window_sec: int) -> bool:
+    now = time.time()
+    with _RATE_LOCK:
+        bucket = _RATE_LIMITS.setdefault(key, deque())
+        while bucket and now - bucket[0] > window_sec:
+            bucket.popleft()
+        if len(bucket) >= max_calls:
+            return False
+        bucket.append(now)
+        return True
+
+
+def _client_key() -> str:
+    return request.headers.get("X-Forwarded-For", request.remote_addr or "unknown")
+
+
 # ---------------------------------------------------------------------------
 # Demo / background simulator
 # ---------------------------------------------------------------------------
@@ -420,10 +443,14 @@ def create_app(demo_mode: bool = True) -> Flask:
     @app.post("/api/ingest")
     def api_ingest() -> Response:
         """Accept a JSON payload and run through the threat pipeline."""
+        if not _rate_limit(f"ingest:{_client_key()}", 60, 60):
+            return jsonify({"error": "rate limit exceeded"}), 429
         payload = request.get_json(force=True, silent=True) or {}
         raw = payload.get("raw", "")
         if not raw:
             return jsonify({"error": "field 'raw' is required"}), 400
+        if len(raw) > _MAX_LOG_LEN:
+            return jsonify({"error": f"raw log exceeds max {_MAX_LOG_LEN} chars"}), 400
         event  = analyzer.parse(str(raw))
         report = detector.analyze(event)
         store.add_report(report)
@@ -436,10 +463,14 @@ def create_app(demo_mode: bool = True) -> Flask:
     @app.post("/api/ingest/email")
     def api_ingest_email() -> Response:
         """Accept a raw RFC 5322 email string and return the threat scan."""
+        if not _rate_limit(f"ingest_email:{_client_key()}", 20, 60):
+            return jsonify({"error": "rate limit exceeded"}), 429
         payload = request.get_json(force=True, silent=True) or {}
         raw = payload.get("raw", "")
         if not raw:
             return jsonify({"error": "field 'raw' is required"}), 400
+        if len(raw) > _MAX_EMAIL_LEN:
+            return jsonify({"error": f"raw email exceeds max {_MAX_EMAIL_LEN} chars"}), 400
         result = email_scan.scan_raw(str(raw))
         store.add_email(result)
         return jsonify({
@@ -450,6 +481,11 @@ def create_app(demo_mode: bool = True) -> Flask:
 
     @app.post("/api/quantaweave/keygen")
     def api_quantaweave_keygen() -> Response:
+        auth = _require_api_key()
+        if auth is not None:
+            return auth
+        if not _rate_limit(f"qw_keygen:{_client_key()}", 20, 60):
+            return jsonify({"error": "rate limit exceeded"}), 429
         payload = request.get_json(force=True, silent=True) or {}
         level = payload.get("level", "LEVEL1")
         if level not in {"LEVEL1", "LEVEL3", "LEVEL5"}:
@@ -467,6 +503,11 @@ def create_app(demo_mode: bool = True) -> Flask:
 
     @app.post("/api/quantaweave/encrypt")
     def api_quantaweave_encrypt() -> Response:
+        auth = _require_api_key()
+        if auth is not None:
+            return auth
+        if not _rate_limit(f"qw_encrypt:{_client_key()}", 30, 60):
+            return jsonify({"error": "rate limit exceeded"}), 429
         payload = request.get_json(force=True, silent=True) or {}
         message = payload.get("message", "")
         public_key = payload.get("public_key")
@@ -474,6 +515,8 @@ def create_app(demo_mode: bool = True) -> Flask:
             return jsonify({"error": "public_key is required"}), 400
         if not isinstance(message, str):
             return jsonify({"error": "message must be a string"}), 400
+        if len(message.encode("utf-8")) > _MAX_MESSAGE_LEN:
+            return jsonify({"error": f"message exceeds max {_MAX_MESSAGE_LEN} bytes"}), 400
         try:
             ciphertext = QuantaWeave.encrypt(message.encode("utf-8"), public_key)
         except Exception as exc:
@@ -482,6 +525,11 @@ def create_app(demo_mode: bool = True) -> Flask:
 
     @app.post("/api/quantaweave/decrypt")
     def api_quantaweave_decrypt() -> Response:
+        auth = _require_api_key()
+        if auth is not None:
+            return auth
+        if not _rate_limit(f"qw_decrypt:{_client_key()}", 30, 60):
+            return jsonify({"error": "rate limit exceeded"}), 429
         payload = request.get_json(force=True, silent=True) or {}
         ciphertext = payload.get("ciphertext")
         private_key = payload.get("private_key")
@@ -497,6 +545,11 @@ def create_app(demo_mode: bool = True) -> Flask:
 
     @app.post("/api/mlkem/keygen")
     def api_mlkem_keygen() -> Response:
+        auth = _require_api_key()
+        if auth is not None:
+            return auth
+        if not _rate_limit(f"mlkem_keygen:{_client_key()}", 20, 60):
+            return jsonify({"error": "rate limit exceeded"}), 429
         payload = request.get_json(force=True, silent=True) or {}
         alg = payload.get("alg", "ML-KEM-512")
         try:
@@ -511,11 +564,18 @@ def create_app(demo_mode: bool = True) -> Flask:
 
     @app.post("/api/mlkem/encaps")
     def api_mlkem_encaps() -> Response:
+        auth = _require_api_key()
+        if auth is not None:
+            return auth
+        if not _rate_limit(f"mlkem_encaps:{_client_key()}", 30, 60):
+            return jsonify({"error": "rate limit exceeded"}), 429
         payload = request.get_json(force=True, silent=True) or {}
         alg = payload.get("alg", "ML-KEM-512")
         public_key_b64 = payload.get("public_key_b64", "")
         if not public_key_b64:
             return jsonify({"error": "public_key_b64 is required"}), 400
+        if len(public_key_b64) > _MAX_B64_LEN:
+            return jsonify({"error": "public_key_b64 too large"}), 400
         try:
             public_key = _b64d(public_key_b64)
             ciphertext, shared_secret = kem_encaps(public_key, alg)
@@ -528,12 +588,19 @@ def create_app(demo_mode: bool = True) -> Flask:
 
     @app.post("/api/mlkem/decaps")
     def api_mlkem_decaps() -> Response:
+        auth = _require_api_key()
+        if auth is not None:
+            return auth
+        if not _rate_limit(f"mlkem_decaps:{_client_key()}", 30, 60):
+            return jsonify({"error": "rate limit exceeded"}), 429
         payload = request.get_json(force=True, silent=True) or {}
         alg = payload.get("alg", "ML-KEM-512")
         ciphertext_b64 = payload.get("ciphertext_b64", "")
         secret_key_b64 = payload.get("secret_key_b64", "")
         if not ciphertext_b64 or not secret_key_b64:
             return jsonify({"error": "ciphertext_b64 and secret_key_b64 are required"}), 400
+        if len(ciphertext_b64) > _MAX_B64_LEN or len(secret_key_b64) > _MAX_B64_LEN:
+            return jsonify({"error": "ciphertext/secret key too large"}), 400
         try:
             ciphertext = _b64d(ciphertext_b64)
             secret_key = _b64d(secret_key_b64)
@@ -546,6 +613,11 @@ def create_app(demo_mode: bool = True) -> Flask:
 
     @app.post("/api/mldsa/keygen")
     def api_mldsa_keygen() -> Response:
+        auth = _require_api_key()
+        if auth is not None:
+            return auth
+        if not _rate_limit(f"mldsa_keygen:{_client_key()}", 20, 60):
+            return jsonify({"error": "rate limit exceeded"}), 429
         payload = request.get_json(force=True, silent=True) or {}
         alg = payload.get("alg", "ML-DSA-44")
         try:
@@ -560,6 +632,11 @@ def create_app(demo_mode: bool = True) -> Flask:
 
     @app.post("/api/mldsa/sign")
     def api_mldsa_sign() -> Response:
+        auth = _require_api_key()
+        if auth is not None:
+            return auth
+        if not _rate_limit(f"mldsa_sign:{_client_key()}", 30, 60):
+            return jsonify({"error": "rate limit exceeded"}), 429
         payload = request.get_json(force=True, silent=True) or {}
         alg = payload.get("alg", "ML-DSA-44")
         secret_key_b64 = payload.get("secret_key_b64", "")
@@ -568,6 +645,10 @@ def create_app(demo_mode: bool = True) -> Flask:
             return jsonify({"error": "secret_key_b64 is required"}), 400
         if not isinstance(message, str):
             return jsonify({"error": "message must be a string"}), 400
+        if len(secret_key_b64) > _MAX_B64_LEN:
+            return jsonify({"error": "secret_key_b64 too large"}), 400
+        if len(message.encode("utf-8")) > _MAX_MESSAGE_LEN:
+            return jsonify({"error": f"message exceeds max {_MAX_MESSAGE_LEN} bytes"}), 400
         try:
             secret_key = _b64d(secret_key_b64)
             signature = sig_sign(secret_key, message.encode("utf-8"), alg)
@@ -579,6 +660,11 @@ def create_app(demo_mode: bool = True) -> Flask:
 
     @app.post("/api/mldsa/verify")
     def api_mldsa_verify() -> Response:
+        auth = _require_api_key()
+        if auth is not None:
+            return auth
+        if not _rate_limit(f"mldsa_verify:{_client_key()}", 30, 60):
+            return jsonify({"error": "rate limit exceeded"}), 429
         payload = request.get_json(force=True, silent=True) or {}
         alg = payload.get("alg", "ML-DSA-44")
         public_key_b64 = payload.get("public_key_b64", "")
@@ -588,6 +674,10 @@ def create_app(demo_mode: bool = True) -> Flask:
             return jsonify({"error": "public_key_b64 and signature_b64 are required"}), 400
         if not isinstance(message, str):
             return jsonify({"error": "message must be a string"}), 400
+        if len(public_key_b64) > _MAX_B64_LEN or len(signature_b64) > _MAX_B64_LEN:
+            return jsonify({"error": "public_key/signature too large"}), 400
+        if len(message.encode("utf-8")) > _MAX_MESSAGE_LEN:
+            return jsonify({"error": f"message exceeds max {_MAX_MESSAGE_LEN} bytes"}), 400
         try:
             public_key = _b64d(public_key_b64)
             signature = _b64d(signature_b64)
@@ -602,6 +692,8 @@ def create_app(demo_mode: bool = True) -> Flask:
         auth = _require_api_key()
         if auth is not None:
             return auth
+        if not _rate_limit(f"imap:{_client_key()}", 6, 60):
+            return jsonify({"error": "rate limit exceeded"}), 429
         payload = request.get_json(force=True, silent=True) or {}
         host = payload.get("host", "")
         username = payload.get("username", "")
@@ -611,6 +703,8 @@ def create_app(demo_mode: bool = True) -> Flask:
         port = int(payload.get("port", 993))
         if not host or not username or not password:
             return jsonify({"error": "host, username, and password are required"}), 400
+        if limit < 1 or limit > 200:
+            return jsonify({"error": "limit must be 1-200"}), 400
         try:
             results = email_scan.connect_and_scan_imap(
                 host=host,
@@ -686,6 +780,8 @@ def create_app(demo_mode: bool = True) -> Flask:
         auth = _require_api_key()
         if auth is not None:
             return auth
+        if not _rate_limit(f"redteam_portscan:{_client_key()}", 10, 60):
+            return jsonify({"error": "rate limit exceeded"}), 429
         """
         TCP-connect port scan a single host.
 
@@ -713,6 +809,11 @@ def create_app(demo_mode: bool = True) -> Flask:
             return jsonify(
                 {"error": f"port list too large (max {_MAX_PORTS})"}
             ), 400
+        if ports:
+            if not isinstance(ports, list) or not all(isinstance(p, int) for p in ports):
+                return jsonify({"error": "ports must be a list of integers"}), 400
+            if any(p < 1 or p > 65535 for p in ports):
+                return jsonify({"error": "ports must be between 1 and 65535"}), 400
         if port_range and (
             not isinstance(port_range, list)
             or len(port_range) != 2
@@ -721,6 +822,8 @@ def create_app(demo_mode: bool = True) -> Flask:
             return jsonify(
                 {"error": f"port_range span exceeds max of {_MAX_PORTS}"}
             ), 400
+        if port_range and (port_range[0] < 1 or port_range[1] > 65535):
+            return jsonify({"error": "port_range must be within 1-65535"}), 400
 
         results = port_scanner.scan(
             host,
@@ -744,6 +847,8 @@ def create_app(demo_mode: bool = True) -> Flask:
         auth = _require_api_key()
         if auth is not None:
             return auth
+        if not _rate_limit(f"redteam_vulnscan:{_client_key()}", 30, 60):
+            return jsonify({"error": "rate limit exceeded"}), 429
         """
         Check a service banner string against known CVE patterns.
 
@@ -781,6 +886,8 @@ def create_app(demo_mode: bool = True) -> Flask:
         auth = _require_api_key()
         if auth is not None:
             return auth
+        if not _rate_limit(f"redteam_credaudit:{_client_key()}", 20, 60):
+            return jsonify({"error": "rate limit exceeded"}), 429
         """
         Audit one or more password strings for strength.
 
@@ -820,6 +927,8 @@ def create_app(demo_mode: bool = True) -> Flask:
         auth = _require_api_key()
         if auth is not None:
             return auth
+        if not _rate_limit(f"redteam_recon:{_client_key()}", 20, 60):
+            return jsonify({"error": "rate limit exceeded"}), 429
         """
         Passive recon using DNS resolution and optional quick probes.
 
@@ -834,6 +943,8 @@ def create_app(demo_mode: bool = True) -> Flask:
         quick_ports = payload.get("quick_ports")
         if quick_ports is not None and not isinstance(quick_ports, list):
             return jsonify({"error": "quick_ports must be a list of integers"}), 400
+        if quick_ports and any((not isinstance(p, int)) or p < 1 or p > 65535 for p in quick_ports):
+            return jsonify({"error": "quick_ports must be integers between 1 and 65535"}), 400
 
         result = recon_scanner.recon(
             str(target),
@@ -855,6 +966,8 @@ def create_app(demo_mode: bool = True) -> Flask:
         auth = _require_api_key()
         if auth is not None:
             return auth
+        if not _rate_limit(f"redteam_shellcode:{_client_key()}", 20, 60):
+            return jsonify({"error": "rate limit exceeded"}), 429
         """
         Disassemble and classify shellcode bytes.
 
@@ -915,6 +1028,8 @@ def create_app(demo_mode: bool = True) -> Flask:
         auth = _require_api_key()
         if auth is not None:
             return auth
+        if not _rate_limit(f"redteam_yara:{_client_key()}", 10, 60):
+            return jsonify({"error": "rate limit exceeded"}), 429
         """
         Scan a content buffer against YARA rule sets.
 
@@ -956,6 +1071,8 @@ def create_app(demo_mode: bool = True) -> Flask:
 
         rule_sets    = payload.get("rule_sets")      # None → all built-ins
         custom_rules = payload.get("custom_rules", "")
+        if custom_rules and len(custom_rules) > _MAX_RULES_LEN:
+            return jsonify({"error": "custom_rules too large"}), 400
 
         try:
             scanner = YaraScanner(rule_sets=rule_sets, extra_rules=custom_rules)
@@ -985,6 +1102,8 @@ def create_app(demo_mode: bool = True) -> Flask:
         auth = _require_api_key()
         if auth is not None:
             return auth
+        if not _rate_limit(f"redteam_anomaly:{_client_key()}", 10, 60):
+            return jsonify({"error": "rate limit exceeded"}), 429
         """
         Run unsupervised anomaly detection on a set of security observations.
 
