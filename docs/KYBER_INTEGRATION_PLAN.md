@@ -8,7 +8,7 @@ This document describes the current state and future plans for the Key Encapsula
 
 - **LWE KEM**: Pure-Python educational implementation in `quantaweave/lwe_kem_core.py` using the Learning With Errors (LWE) problem
 - **Falcon Signatures**: Lattice-based signatures via a C++ binding in `quantaweave/falcon.py`
-- **`kyber_dilithium_hqc.py`**: ML-KEM/ML-DSA API module exposing `kem_keygen`, `kem_encaps`, `kem_decaps`, `sig_keygen`, `sig_sign`, `sig_verify`
+- **`mlkem_mldsa_bridge.py`**: ML-KEM/ML-DSA API module exposing `kem_keygen`, `kem_encaps`, `kem_decaps`, `sig_keygen`, `sig_sign`, `sig_verify`
 
 ## Planned C Integration
 
@@ -20,12 +20,12 @@ updated to call the C implementations instead of the pure-Python fallback.
 
 1. Complete C random number generator implementation (`vendor/kyber_dilithium/`)
 2. Build and test the C extension (`_pq_kem_sig`)
-3. Update `kyber_dilithium_hqc.py` to delegate to the C extension when available, falling back to the pure-Python implementation
+3. Update `mlkem_mldsa_bridge.py` to delegate to the C extension when available, falling back to the pure-Python implementation
 
 ## Usage
 
 ```python
-from kyber_dilithium_hqc import kem_keygen, kem_encaps, kem_decaps, sig_keygen, sig_sign, sig_verify
+from mlkem_mldsa_bridge import kem_keygen, kem_encaps, kem_decaps, sig_keygen, sig_sign, sig_verify
 
 # KEM round-trip
 keys = kem_keygen()

@@ -6,10 +6,10 @@ This document provides a security analysis of the QuantaWeave implementation.
 
 ## Scope and Repository Notes
 
-- The repository includes an LWE-based encryption library and ML-KEM/ML-DSA bindings via `kyber_dilithium_hqc.py`.
+- The repository includes an LWE-based encryption library and ML-KEM/ML-DSA bindings via the bridge module `mlkem_mldsa_bridge.py`.
 - The `encapsulation_decapsulation.py` demo uses RSA-OAEP for key wrapping, which is **not** post-quantum secure, and requires the `cryptography` package.
 - The `key_generation.py` file is a disabled RSA keygen example (wrapped in a docstring).
-- `kyber_dilithium_hqc.py` provides the ML-KEM and ML-DSA Python API (C integration is work in progress).
+- `mlkem_mldsa_bridge.py` provides the ML-KEM and ML-DSA Python API (C integration is work in progress).
 - `results_v2.md` is a baseline template with sample data, not verified benchmarks.
 - Falcon signatures are provided via a C++ binding and require GMP at build/runtime.
 
@@ -240,7 +240,7 @@ The security of our algorithm is based on the hardness of the LWE problem:
 
 ## Conclusion
 
-This implementation provides a solid educational foundation for understanding post-quantum cryptography. However, for production use:
+This implementation aims for post-quantum resistance based on current research, but no cryptosystem can be guaranteed "definitely" secure. For production use:
 
 ⚠️ **WARNING**: This is an educational implementation. For production:
 - Use NIST-standardized algorithms

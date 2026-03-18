@@ -8,6 +8,10 @@
 - Refreshed GUI and dashboard visuals for a more robust, grounded feel.
 - Added `capstone` and `click` to requirements to support tests and Flask CLI.
 - Rebuilt Azure integration with DefaultAzureCredential-first clients and config schema.
+- Removed HQC from QuantaWeave and docs, switching to ML-KEM/ML-DSA + Falcon.
+- Renamed ML-KEM/ML-DSA bridge to `mlkem_mldsa_bridge.py` with a deprecation stub.
+- Updated hybrid examples/tests and benchmark baselines for Falcon sign/verify.
+- Added dashboard import compatibility package and dev dependency install helpers.
 
 ## 0.1.0 - 2026-02-13
 
