@@ -20,6 +20,31 @@ imagePullSecrets: []
 # -- Replica / scaling -------------------------------------------------------
 replicaCount: 1
 
+# -- Worker ------------------------------------------------------------------
+# Background threat-analysis worker (separate deployment).
+worker:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: ""
+    tag: ""
+    pullPolicy: ""
+  command: ["python", "-m", "sentinel_weave.worker"]
+  args:
+    - "--log-file"
+    - "/app/sentinel_weave/Examples/dummy_logs/11_weekly_soc_mixed_840.log"
+    - "--interval"
+    - "30"
+    - "--batch-size"
+    - "0"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
 autoscaling:
   enabled: false
   minReplicas: 1

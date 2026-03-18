@@ -1,0 +1,8 @@
+2026-03-06T14:00:05 INFO correlator: report_ingested src=203.0.113.45 sig=PORT_SCAN score=0.41 level=MEDIUM
+2026-03-06T14:01:19 INFO correlator: report_ingested src=203.0.113.45 sig=SSH_BRUTE_FORCE score=0.57 level=HIGH
+2026-03-06T14:02:08 WARNING correlator: report_ingested src=203.0.113.45 sig=SQL_INJECTION score=0.69 level=HIGH
+2026-03-06T14:03:33 WARNING correlator: report_ingested src=203.0.113.45 sig=COMMAND_INJECTION score=0.81 level=CRITICAL
+2026-03-06T14:04:40 ALERT correlator: campaign_created attacker_ip=203.0.113.45 event_count=4 phase=EXECUTION
+2026-03-06T14:04:41 ALERT correlator: campaign_summary type=MULTI_VECTOR signatures=PORT_SCAN,SSH_BRUTE_FORCE,SQL_INJECTION,COMMAND_INJECTION
+2026-03-06T14:04:42 CRITICAL correlator: campaign_escalated attacker_ip=203.0.113.45 severity=CRITICAL duration_seconds=277
+2026-03-06T14:05:11 NOTICE threat-intel: campaign_enriched source=internal-mitre-mapper confidence=0.92

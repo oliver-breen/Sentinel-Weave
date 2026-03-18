@@ -1,0 +1,8 @@
+2026-03-07T12:20:00 INFO azure-auth: DefaultAzureCredential acquired token scope=https://storage.azure.com/.default
+2026-03-07T12:20:04 INFO azure-blob: upload success container=sentinel-reports blob=report-20260307-1220.bin size=8421
+2026-03-07T12:20:09 NOTICE azure-text-analytics: sentiment=negative pii_entities=2 language=en confidence=0.98
+2026-03-07T12:20:14 WARNING azure-cosmos: retryable_throttle status=429 retry_after_ms=250 collection=threatReports
+2026-03-07T12:20:15 INFO azure-cosmos: write success id=tr-2026-03-07-001 partition=SOC-EAST
+2026-03-07T12:20:19 INFO azure-servicebus: message published queue=threat-alerts message_id=ab7e3f72-85b3-4f04
+2026-03-07T12:20:22 INFO azure-eventhubs: event sent hub=sentinel-stream partition_id=3 sequence_hint=18422
+2026-03-07T12:20:27 INFO appinsights: telemetry emitted operation=threat_report_ingest duration_ms=91 result=success

@@ -1,0 +1,4 @@
+CEF:0|SentinelWeave|ThreatEngine|1.0|SSH_BRUTE_FORCE|Repeated SSH authentication failures|8|src=185.199.110.12 spt=50243 dst=10.20.5.22 dpt=22 outcome=blocked cs1Label=campaign cs1=AUTH-2026-001
+CEF:0|SentinelWeave|ThreatEngine|1.0|SQL_INJECTION|WAF blocked SQL injection attempt|8|src=203.0.113.77 request=/app/search cs1Label=rule cs1=union-select-detection outcome=blocked
+CEF:0|SentinelWeave|ThreatEngine|1.0|XSS_ATTEMPT|Reflected XSS payload rejected|5|src=198.51.100.24 request=/support/ticket outcome=blocked
+CEF:0|SentinelWeave|ThreatEngine|1.0|DDoS_INDICATOR|Ingress flood threshold exceeded|10|src=198.51.100.44 cs2Label=rate cs2=418.10/s outcome=mitigated

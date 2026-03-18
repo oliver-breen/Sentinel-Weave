@@ -33,12 +33,14 @@ import json
 import sys
 import os
 import base64
+from pathlib import Path
 
 from .event_analyzer    import EventAnalyzer
 from .threat_detector   import ThreatDetector, summarize_reports, ThreatLevel
 from .azure_integration import TextAnalyticsClient, SecurityTelemetry
 from .threat_correlator import ThreatCorrelator
 from .ml_pipeline       import DatasetBuilder, SecurityClassifier, evaluate_classifier
+from .threat_query      import ThreatQueryEngine, dsl_to_query
 
 
 # ---------------------------------------------------------------------------
@@ -358,6 +360,20 @@ def cmd_demo(_args: argparse.Namespace) -> int:
         "Jan 15 10:35:00 server syslog: Failed password for root from 192.168.1.100 port 52399 ssh2",
     ]
 
+    use_fixture_logs = (
+        bool(getattr(_args, "fixtures", False))
+        or bool(os.getenv("PYTEST_CURRENT_TEST"))
+        or os.getenv("SENTINELWEAVE_DEMO_FIXTURES", "").strip().lower() in {"1", "true", "yes", "on"}
+    )
+    if use_fixture_logs:
+        fixtures_dir = Path(__file__).resolve().parent / "Examples" / "dummy_logs"
+        fixture_lines: list[str] = []
+        for log_file in sorted(fixtures_dir.glob("*.log")):
+            with log_file.open(encoding="utf-8", errors="replace") as fh:
+                fixture_lines.extend(line for line in fh.read().splitlines() if line.strip())
+        if fixture_lines:
+            DEMO_LINES.extend(fixture_lines)
+
     print(_c("\n═══ SentinelWeave — Live Demo ═══\n", "BOLD"))
 
     analyzer  = EventAnalyzer()
@@ -403,6 +419,58 @@ def cmd_demo(_args: argparse.Namespace) -> int:
     print(f"    Sentiment : {nlp_result['sentiment']}")
     print(f"    Key phrases: {', '.join(nlp_result['key_phrases'][:5])}")
     print(f"    Source    : {nlp_result['source']}")
+
+    print()
+    return 0
+
+
+def cmd_hunt(args: argparse.Namespace) -> int:
+    """Run threat-hunting queries against analyzed log reports."""
+    analyzer = EventAnalyzer()
+    detector = ThreatDetector(
+        z_threshold=args.z_threshold,
+        min_baseline_samples=args.min_baseline,
+    )
+
+    if args.file == "-":
+        lines = sys.stdin.read().splitlines()
+    else:
+        with open(args.file, encoding="utf-8", errors="replace") as fh:
+            lines = fh.read().splitlines()
+
+    if not lines:
+        print("No log lines found.", file=sys.stderr)
+        return 1
+
+    events = analyzer.parse_bulk(lines)
+    reports = detector.analyze_bulk(events)
+    engine = ThreatQueryEngine(reports)
+
+    dsl_input = " ".join(args.query).strip()
+    query_expr = dsl_to_query(dsl_input)
+
+    try:
+        matches = engine.query(query_expr)
+    except ValueError as exc:
+        print(f"Query error: {exc}", file=sys.stderr)
+        return 1
+
+    print(_c("\n═══ SentinelWeave — Threat Hunt ═══", "BOLD"))
+    print(f"  Log file      : {args.file}")
+    print(f"  DSL           : {dsl_input}")
+    print(f"  Query         : {query_expr or '(all)'}")
+    print(f"  Matches       : {len(matches)} / {len(reports)}")
+
+    if not matches:
+        print(_c("\n  No matching events.", "DIM"))
+        print()
+        return 0
+
+    print(_c(f"\n  Top {min(args.top, len(matches))} matches:", "BOLD"))
+    for r in sorted(matches, key=lambda x: x.anomaly_score, reverse=True)[:args.top]:
+        col = _LEVEL_COLOUR.get(r.threat_level.value, "")
+        line = r.event.raw[:130] + ("…" if len(r.event.raw) > 130 else "")
+        print(f"    {col}[{r.threat_level.value:<8}] score={r.anomaly_score:.3f} ip={r.event.source_ip or 'n/a':<15}{_COLOURS['RESET']} {line}")
 
     print()
     return 0
@@ -474,7 +542,22 @@ def build_parser() -> argparse.ArgumentParser:
                          help="Export Azure ML scoring schema to this JSON file")
 
     # demo
-    sub.add_parser("demo", help="Run a built-in demonstration")
+    p_demo = sub.add_parser("demo", help="Run a built-in demonstration")
+    p_demo.add_argument(
+        "--fixtures",
+        action="store_true",
+        help="Load sentinel_weave/Examples/dummy_logs/*.log into the demo dataset",
+    )
+
+    # hunt
+    p_hunt = sub.add_parser("hunt", help="Run threat-hunting DSL queries on a log file")
+    p_hunt.add_argument("file", help="Log file path (use '-' for stdin)")
+    p_hunt.add_argument("query", nargs="+", help="DSL query, e.g. level:HIGH src:192.168.* sig:SSH_BRUTE_FORCE")
+    p_hunt.add_argument("--top", type=int, default=20, metavar="N", help="Show top N matched events (default 20)")
+    p_hunt.add_argument("--z-threshold", type=float, default=3.0, metavar="Z",
+                        help="Z-score threshold for anomaly detection (default 3.0)")
+    p_hunt.add_argument("--min-baseline", type=int, default=10, metavar="N",
+                        help="Min events before z-score analysis activates (default 10)")
 
     return parser
 
@@ -490,6 +573,7 @@ def main() -> None:
         "correlate": cmd_correlate,
         "train":     cmd_train,
         "demo":      cmd_demo,
+        "hunt":      cmd_hunt,
     }
 
     handler = handlers.get(args.command)
