@@ -29,7 +29,9 @@ Import and attach to an existing app::
 
 from __future__ import annotations
 
+import base64
 import json
+import logging
 import queue
 import random
 import threading
@@ -39,7 +41,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Any
 
-from flask import Flask, Response, jsonify, render_template, request
+from flask import Flask, Response, jsonify, render_template, request, send_from_directory
 
 # ---------------------------------------------------------------------------
 # Import SentinelWeave — relative to the repository root
@@ -54,6 +56,15 @@ from sentinel_weave import (
     ThreatReport,
     ThreatCorrelator,
     summarize_reports,
+)
+from quantaweave import QuantaWeave
+from mlkem_mldsa_bridge import (
+    kem_keygen,
+    kem_encaps,
+    kem_decaps,
+    sig_keygen,
+    sig_sign,
+    sig_verify,
 )
 from sentinel_weave.email_scanner import EmailScanner, EmailScanResult
 from sentinel_weave.red_team_toolkit import (
@@ -246,6 +257,14 @@ def _metrics_to_dict(m: DashboardMetrics) -> dict[str, Any]:
     }
 
 
+def _b64e(data: bytes) -> str:
+    return base64.b64encode(data).decode("ascii")
+
+
+def _b64d(text: str) -> bytes:
+    return base64.b64decode(text.encode("ascii"))
+
+
 # ---------------------------------------------------------------------------
 # Demo / background simulator
 # ---------------------------------------------------------------------------
@@ -310,6 +329,10 @@ def create_app(demo_mode: bool = True) -> Flask:
         template_folder=os.path.join(here, "templates"),
         static_folder  =os.path.join(here, "static"),
     )
+    logger = logging.getLogger("sentinelweave.dashboard")
+    if not logger.handlers:
+        logging.basicConfig(level=logging.INFO)
+    ui_dist = os.path.abspath(os.path.join(here, "..", "dashboard_web", "dist"))
 
     store      = MetricsStore()
     analyzer   = EventAnalyzer()
@@ -347,6 +370,23 @@ def create_app(demo_mode: bool = True) -> Flask:
     # Expose store on app for testing
     app.store = store  # type: ignore[attr-defined]
 
+    @app.before_request
+    def _log_request_start() -> None:
+        request.start_time = time.time()  # type: ignore[attr-defined]
+
+    @app.after_request
+    def _log_request_end(response: Response) -> Response:
+        start = getattr(request, "start_time", None)
+        elapsed_ms = (time.time() - start) * 1000 if start else 0.0
+        logger.info(
+            "%s %s -> %s (%.1f ms)",
+            request.method,
+            request.path,
+            response.status_code,
+            elapsed_ms,
+        )
+        return response
+
     # ------------------------------------------------------------------ #
     # Routes                                                               #
     # ------------------------------------------------------------------ #
@@ -354,6 +394,18 @@ def create_app(demo_mode: bool = True) -> Flask:
     @app.get("/")
     def index() -> str:
         return render_template("index.html")
+
+    @app.get("/ui")
+    def ui_index() -> Response | str:
+        if os.path.isdir(ui_dist):
+            return send_from_directory(ui_dist, "index.html")
+        return render_template("index.html")
+
+    @app.get("/ui/<path:asset>")
+    def ui_asset(asset: str) -> Response:
+        if not os.path.isdir(ui_dist):
+            return jsonify({"error": "ui not built"}), 404
+        return send_from_directory(ui_dist, asset)
 
     @app.get("/api/summary")
     def api_summary() -> Response:
@@ -395,6 +447,198 @@ def create_app(demo_mode: bool = True) -> Flask:
             "risk_score":   round(result.risk_score, 4),
             "indicators":   [i.name for i in result.indicators],
         }), 201
+
+    @app.post("/api/quantaweave/keygen")
+    def api_quantaweave_keygen() -> Response:
+        payload = request.get_json(force=True, silent=True) or {}
+        level = payload.get("level", "LEVEL1")
+        if level not in {"LEVEL1", "LEVEL3", "LEVEL5"}:
+            return jsonify({"error": "level must be LEVEL1, LEVEL3, or LEVEL5"}), 400
+        try:
+            pqc = QuantaWeave(security_level=level)
+            public_key, private_key = pqc.generate_keypair()
+        except Exception as exc:
+            return jsonify({"error": str(exc)}), 400
+        return jsonify({
+            "public_key": public_key,
+            "private_key": private_key,
+            "level": level,
+        }), 200
+
+    @app.post("/api/quantaweave/encrypt")
+    def api_quantaweave_encrypt() -> Response:
+        payload = request.get_json(force=True, silent=True) or {}
+        message = payload.get("message", "")
+        public_key = payload.get("public_key")
+        if not public_key:
+            return jsonify({"error": "public_key is required"}), 400
+        if not isinstance(message, str):
+            return jsonify({"error": "message must be a string"}), 400
+        try:
+            ciphertext = QuantaWeave.encrypt(message.encode("utf-8"), public_key)
+        except Exception as exc:
+            return jsonify({"error": str(exc)}), 400
+        return jsonify({"ciphertext": ciphertext}), 200
+
+    @app.post("/api/quantaweave/decrypt")
+    def api_quantaweave_decrypt() -> Response:
+        payload = request.get_json(force=True, silent=True) or {}
+        ciphertext = payload.get("ciphertext")
+        private_key = payload.get("private_key")
+        if not ciphertext or not private_key:
+            return jsonify({"error": "ciphertext and private_key are required"}), 400
+        try:
+            plaintext = QuantaWeave.decrypt(ciphertext, private_key)
+        except Exception as exc:
+            return jsonify({"error": str(exc)}), 400
+        return jsonify({
+            "plaintext": plaintext.decode("utf-8", errors="replace"),
+        }), 200
+
+    @app.post("/api/mlkem/keygen")
+    def api_mlkem_keygen() -> Response:
+        payload = request.get_json(force=True, silent=True) or {}
+        alg = payload.get("alg", "ML-KEM-512")
+        try:
+            public_key, secret_key = kem_keygen(alg)
+        except Exception as exc:
+            return jsonify({"error": str(exc)}), 400
+        return jsonify({
+            "alg": alg,
+            "public_key_b64": _b64e(public_key),
+            "secret_key_b64": _b64e(secret_key),
+        }), 200
+
+    @app.post("/api/mlkem/encaps")
+    def api_mlkem_encaps() -> Response:
+        payload = request.get_json(force=True, silent=True) or {}
+        alg = payload.get("alg", "ML-KEM-512")
+        public_key_b64 = payload.get("public_key_b64", "")
+        if not public_key_b64:
+            return jsonify({"error": "public_key_b64 is required"}), 400
+        try:
+            public_key = _b64d(public_key_b64)
+            ciphertext, shared_secret = kem_encaps(public_key, alg)
+        except Exception as exc:
+            return jsonify({"error": str(exc)}), 400
+        return jsonify({
+            "ciphertext_b64": _b64e(ciphertext),
+            "shared_secret_b64": _b64e(shared_secret),
+        }), 200
+
+    @app.post("/api/mlkem/decaps")
+    def api_mlkem_decaps() -> Response:
+        payload = request.get_json(force=True, silent=True) or {}
+        alg = payload.get("alg", "ML-KEM-512")
+        ciphertext_b64 = payload.get("ciphertext_b64", "")
+        secret_key_b64 = payload.get("secret_key_b64", "")
+        if not ciphertext_b64 or not secret_key_b64:
+            return jsonify({"error": "ciphertext_b64 and secret_key_b64 are required"}), 400
+        try:
+            ciphertext = _b64d(ciphertext_b64)
+            secret_key = _b64d(secret_key_b64)
+            shared_secret = kem_decaps(ciphertext, secret_key, alg)
+        except Exception as exc:
+            return jsonify({"error": str(exc)}), 400
+        return jsonify({
+            "shared_secret_b64": _b64e(shared_secret),
+        }), 200
+
+    @app.post("/api/mldsa/keygen")
+    def api_mldsa_keygen() -> Response:
+        payload = request.get_json(force=True, silent=True) or {}
+        alg = payload.get("alg", "ML-DSA-44")
+        try:
+            public_key, secret_key = sig_keygen(alg)
+        except Exception as exc:
+            return jsonify({"error": str(exc)}), 400
+        return jsonify({
+            "alg": alg,
+            "public_key_b64": _b64e(public_key),
+            "secret_key_b64": _b64e(secret_key),
+        }), 200
+
+    @app.post("/api/mldsa/sign")
+    def api_mldsa_sign() -> Response:
+        payload = request.get_json(force=True, silent=True) or {}
+        alg = payload.get("alg", "ML-DSA-44")
+        secret_key_b64 = payload.get("secret_key_b64", "")
+        message = payload.get("message", "")
+        if not secret_key_b64:
+            return jsonify({"error": "secret_key_b64 is required"}), 400
+        if not isinstance(message, str):
+            return jsonify({"error": "message must be a string"}), 400
+        try:
+            secret_key = _b64d(secret_key_b64)
+            signature = sig_sign(secret_key, message.encode("utf-8"), alg)
+        except Exception as exc:
+            return jsonify({"error": str(exc)}), 400
+        return jsonify({
+            "signature_b64": _b64e(signature),
+        }), 200
+
+    @app.post("/api/mldsa/verify")
+    def api_mldsa_verify() -> Response:
+        payload = request.get_json(force=True, silent=True) or {}
+        alg = payload.get("alg", "ML-DSA-44")
+        public_key_b64 = payload.get("public_key_b64", "")
+        signature_b64 = payload.get("signature_b64", "")
+        message = payload.get("message", "")
+        if not public_key_b64 or not signature_b64:
+            return jsonify({"error": "public_key_b64 and signature_b64 are required"}), 400
+        if not isinstance(message, str):
+            return jsonify({"error": "message must be a string"}), 400
+        try:
+            public_key = _b64d(public_key_b64)
+            signature = _b64d(signature_b64)
+            valid = sig_verify(public_key, message.encode("utf-8"), signature, alg)
+        except Exception as exc:
+            return jsonify({"error": str(exc)}), 400
+        return jsonify({"valid": bool(valid)}), 200
+
+    @app.post("/api/ingest/imap")
+    def api_ingest_imap() -> Response:
+        """Connect to IMAP and scan the most recent inbox messages."""
+        auth = _require_api_key()
+        if auth is not None:
+            return auth
+        payload = request.get_json(force=True, silent=True) or {}
+        host = payload.get("host", "")
+        username = payload.get("username", "")
+        password = payload.get("password", "")
+        folder = payload.get("folder", "INBOX")
+        limit = int(payload.get("limit", 20))
+        port = int(payload.get("port", 993))
+        if not host or not username or not password:
+            return jsonify({"error": "host, username, and password are required"}), 400
+        try:
+            results = email_scan.connect_and_scan_imap(
+                host=host,
+                port=port,
+                username=username,
+                password=password,
+                folder=folder,
+                limit=limit,
+            )
+        except Exception as exc:
+            return jsonify({"error": str(exc)}), 400
+
+        for r in results:
+            store.add_email(r)
+
+        return jsonify({
+            "count": len(results),
+            "results": [
+                {
+                    "subject": r.email.subject,
+                    "sender": r.email.sender,
+                    "threat_level": r.threat_level.value,
+                    "risk_score": round(r.risk_score, 4),
+                    "indicator_count": len(r.indicators),
+                }
+                for r in results
+            ],
+        }), 200
 
     @app.get("/api/stream")
     def api_stream() -> Response:
@@ -569,6 +813,41 @@ def create_app(demo_mode: bool = True) -> Flask:
                 }
                 for i, r in enumerate(results)
             ],
+        }), 200
+
+    @app.post("/api/redteam/recon")
+    def api_redteam_recon() -> Response:
+        auth = _require_api_key()
+        if auth is not None:
+            return auth
+        """
+        Passive recon using DNS resolution and optional quick probes.
+
+        Request JSON fields:
+          ``target`` (str, required) — hostname or IP address.
+          ``quick_ports`` (list[int], optional) — ports for quick probing.
+        """
+        payload = request.get_json(force=True, silent=True) or {}
+        target = payload.get("target", "")
+        if not target:
+            return jsonify({"error": "field 'target' is required"}), 400
+        quick_ports = payload.get("quick_ports")
+        if quick_ports is not None and not isinstance(quick_ports, list):
+            return jsonify({"error": "quick_ports must be a list of integers"}), 400
+
+        result = recon_scanner.recon(
+            str(target),
+            quick_probe_ports=[int(p) for p in quick_ports] if quick_ports else None,
+        )
+
+        return jsonify({
+            "target": result.target,
+            "resolved_ips": result.resolved_ips,
+            "reverse_hostnames": result.reverse_hostnames,
+            "open_ports_hint": result.open_ports_hint,
+            "ip_version": result.ip_version,
+            "is_private": result.is_private,
+            "metadata": result.metadata,
         }), 200
 
     @app.post("/api/redteam/shellcode")

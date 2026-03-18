@@ -37,6 +37,10 @@ ENV/
 *.swo
 *~
 
+# Node
+node_modules/
+sentinel_weave/dashboard_web/node_modules/
+
 # OS
 .DS_Store
 Thumbs.db
