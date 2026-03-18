@@ -1,0 +1,4 @@
+LEEF:2.0|SentinelWeave|ThreatEngine|1.0|THREAT_EVENT|	src=185.199.110.12	eventName=SSH_BRUTE_FORCE	severity=8	outcome=blocked
+LEEF:2.0|SentinelWeave|ThreatEngine|1.0|THREAT_EVENT|	src=203.0.113.77	eventName=SQL_INJECTION	severity=8	request=/app/search	outcome=blocked
+LEEF:2.0|SentinelWeave|ThreatEngine|1.0|THREAT_EVENT|	src=198.51.100.24	eventName=XSS_ATTEMPT	severity=5	request=/support/ticket	outcome=blocked
+LEEF:2.0|SentinelWeave|ThreatEngine|1.0|AVAILABILITY_EVENT|	src=198.51.100.44	eventName=RATE_EXCEEDED	severity=10	currentRate=418.10/s	outcome=mitigated

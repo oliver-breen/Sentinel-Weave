@@ -59,6 +59,7 @@ from __future__ import annotations
 
 import fnmatch
 import re
+import shlex
 from typing import Sequence
 
 from .threat_detector import ThreatReport
@@ -325,6 +326,10 @@ class ThreatQueryEngine:
                 results.append(report)
         return results
 
+    def query_dsl(self, dsl: str) -> list[ThreatReport]:
+        """Query using compact DSL syntax like ``level:HIGH src:10.0.*``."""
+        return self.query(dsl_to_query(dsl))
+
     def query_one(self, query_str: str) -> ThreatReport | None:
         """Return the first matching report, or *None*."""
         results = self.query(query_str)
@@ -355,3 +360,76 @@ class ThreatQueryEngine:
 
     def __repr__(self) -> str:
         return f"ThreatQueryEngine({len(self._reports)} reports)"
+
+
+_DSL_FIELD_ALIASES: dict[str, str] = {
+    "level": "threat_level",
+    "threat": "threat_level",
+    "src": "source_ip",
+    "ip": "source_ip",
+    "source": "source_ip",
+    "type": "event_type",
+    "event": "event_type",
+    "score": "anomaly_score",
+    "sig": "signature",
+    "signature": "signature",
+    "raw": "raw",
+    "msg": "raw",
+    "explain": "explanation",
+    "explanation": "explanation",
+}
+
+_DSL_COMPARISON_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)(>=|<=|!=|=|>|<|~)(.+)$")
+
+
+def dsl_to_query(dsl: str) -> str:
+    """
+    Convert a compact DSL into a ThreatQueryEngine query expression.
+
+    Examples:
+        ``level:HIGH src:192.168.* sig:SSH_BRUTE_FORCE``
+        -> ``threat_level = HIGH AND source_ip = 192.168.* AND signature = SSH_BRUTE_FORCE``
+    """
+    dsl = dsl.strip()
+    if not dsl:
+        return ""
+
+    parts = shlex.split(dsl)
+    out: list[str] = []
+
+    for part in parts:
+        upper = part.upper()
+        if upper in {"AND", "OR"}:
+            out.append(upper)
+            continue
+        if part in {"(", ")"}:
+            out.append(part)
+            continue
+
+        if ":" in part:
+            key, value = part.split(":", 1)
+            field = _DSL_FIELD_ALIASES.get(key.lower(), key.lower())
+            op = "~" if field in {"raw", "explanation"} else "="
+            out.append(f"{field} {op} {value}")
+            continue
+
+        m = _DSL_COMPARISON_RE.match(part)
+        if m:
+            key, op, value = m.groups()
+            field = _DSL_FIELD_ALIASES.get(key.lower(), key.lower())
+            out.append(f"{field} {op} {value}")
+            continue
+
+        out.append(f"raw ~ {part}")
+
+    stitched: list[str] = []
+    for i, token in enumerate(out):
+        stitched.append(token)
+        if i == len(out) - 1:
+            continue
+        current = token.upper()
+        nxt = out[i + 1].upper()
+        if current not in {"AND", "OR", "("} and nxt not in {"AND", "OR", ")"}:
+            stitched.append("AND")
+
+    return " ".join(stitched)

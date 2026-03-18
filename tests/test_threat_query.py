@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from sentinel_weave.event_analyzer import EventAnalyzer
 from sentinel_weave.threat_detector import ThreatDetector, ThreatLevel, ThreatReport
-from sentinel_weave.threat_query import ThreatQueryEngine
+from sentinel_weave.threat_query import ThreatQueryEngine, dsl_to_query
 
 
 # ---------------------------------------------------------------------------
@@ -295,6 +295,39 @@ class TestThreatQueryEngineErrors(unittest.TestCase):
     def test_truncated_predicate_raises(self) -> None:
         with self.assertRaises((ValueError, IndexError)):
             self.engine.query("threat_level =")
+
+
+class TestThreatQueryDsl(unittest.TestCase):
+    """Compact DSL parsing and execution."""
+
+    def setUp(self) -> None:
+        self.r1 = _make_report("Failed password for root from 192.168.1.5")
+        self.r1.threat_level = ThreatLevel.HIGH
+        self.r1.event.source_ip = "192.168.1.5"
+        self.r1.event.matched_sigs = ["SSH_BRUTE_FORCE"]
+        self.r1.anomaly_score = 0.81
+
+        self.r2 = _make_report("normal login from 10.0.0.2")
+        self.r2.threat_level = ThreatLevel.LOW
+        self.r2.event.source_ip = "10.0.0.2"
+        self.r2.anomaly_score = 0.15
+
+        self.engine = ThreatQueryEngine([self.r1, self.r2])
+
+    def test_dsl_to_query_compiles_aliases(self) -> None:
+        q = dsl_to_query("level:HIGH src:192.168.* sig:SSH_BRUTE_FORCE")
+        self.assertEqual(
+            q,
+            "threat_level = HIGH AND source_ip = 192.168.* AND signature = SSH_BRUTE_FORCE",
+        )
+
+    def test_query_dsl_filters(self) -> None:
+        results = self.engine.query_dsl("level:HIGH src:192.168.* sig:SSH_BRUTE_FORCE")
+        self.assertEqual(results, [self.r1])
+
+    def test_dsl_defaults_to_raw_contains(self) -> None:
+        results = self.engine.query_dsl("password")
+        self.assertEqual(results, [self.r1])
 
 
 if __name__ == "__main__":
