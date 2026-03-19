@@ -3,5 +3,9 @@
         {
             "path": "."
         }
-    ]
+    ],
+    "settings": {
+        "gitkraken.workspaceId": "58210c2d5ba944a6945f1bdfffaa1586",
+        "gitkraken.workspaceAutoAddSetting": "enabled"
+    }
 }
