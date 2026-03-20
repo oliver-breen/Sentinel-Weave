@@ -266,7 +266,7 @@ Sentinel-Weave is designed for extensibility. Here are practical ways to expand 
 Add new views, charts, or API endpoints to the Flask dashboard.
 Integrate additional threat intelligence feeds or user controls.
 
-#### Practical Example: Adding a Threat Intelligence Feed View and User Controls
+    #### Practical Example: Adding a Threat Intelligence Feed View and User Controls
 
 1. **Create a new API endpoint for threat intelligence feeds:**
         ```python
